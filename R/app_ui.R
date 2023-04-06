@@ -1,0 +1,155 @@
+#' The application User-Interface
+#'
+#' @param request Internal parameter for `{shiny}`.
+#'     DO NOT REMOVE.
+#' @import shiny
+#' @noRd
+app_ui <- function(request) {
+  #set up for background color when validating calibrations
+  jsCode <- '
+    shinyjs.backgroundCol = function(params) {
+      var defaultParams = {
+        id : null,
+        col : "red"
+      };
+      params = shinyjs.getParams(params, defaultParams);
+
+      var el = $("#" + params.id);
+      el.css("background-color", params.col);
+    }'
+
+  tagList(
+    # Leave this function for adding external resources
+    golem_add_external_resources(),
+    # Your application UI logic
+    fluidPage(
+      tags$head(
+        tags$meta(name = "viewport", content = "width=device-width, initial-scale=1"),
+        tags$link(rel = "manifest", href = "manifest.json"),
+        tags$link(rel = "apple-touch-icon", href = "icon.png"),
+        tags$link(rel = "icon", type = "image/png", href = "icon.png"),
+        tags$script(src = "serviceworker.js", type = "text/javascript")
+      ),
+
+      shinyjs::extendShinyjs(text = jsCode, functions = c("backgroundCol")),
+
+      # Title
+      titlePanel("Water Quality Monitoring Equipment Calibration"),
+      # Input form
+      sidebarLayout(
+        sidebarPanel(
+          # Questions
+          selectInput("sensor",
+                      label = "Select Sensor Type", choices = c("Temperature", "pH", "ORP", "Conductivity", "Turbidity", "DO", "Depth")),
+          conditionalPanel(
+            condition = "input.sensor == 'pH'",
+            numericInput("pH1_std", label = "Low pH solution value", value = "4"),
+            numericInput("pH2_std", label = "Neutral pH solution value", value = "7"),
+            numericInput("pH3_std", label = "High pH solution value", value = "10"),
+            numericInput("pH1_pre_val", label = paste0("pH 4 Pre-Cal Value"), value = ""),
+            numericInput("pH1_pre_mV", label = "pH 4 Pre-Cal mV", value = ""),
+            numericInput("pH2_pre_val", label = "pH 7 Pre-Cal Value", value = ""),
+            numericInput("pH2_pre_mV", label = "pH 7 Pre-Cal mV", value = ""),
+            numericInput("pH3_pre_val", label = "pH 10 Pre-Cal Value", value = ""),
+            numericInput("pH3_pre_mV", label = "pH 10 Pre-Cal mV", value = ""),
+            numericInput("pH1_post_val", label = "pH 4 Post-Cal Value", value = ""),
+            numericInput("pH1_post_mV", label = "pH 4 Post-Cal mV", value = ""),
+            numericInput("pH2_post_val", label = "pH 7 Post-Cal Value", value = ""),
+            numericInput("pH2_post_mV", label = "pH 7 Post-Cal mV", value = ""),
+            numericInput("pH3_post_val", label = "pH 10 Post-Cal Value", value = ""),
+            numericInput("pH3_post_mV", label = "pH 10 Post-Cal mV", value = ""),
+            actionButton("validate_pH", "Validate measurements"),
+            actionButton("save_cal_pH", "Save this sheet")
+          ),
+          conditionalPanel(
+            condition = "input.sensor == 'ORP'",
+            numericInput("orp_std", label = "ORP Standard solution mV", value = ""),
+            numericInput("orp_pre_mV", label = "ORP mV Pre-Cal Value", value = ""),
+            numericInput("orp_post_mV", label = "ORP mV Post-Cal Value", value = ""),
+            actionButton("validate_ORP", "Validate measurements"),
+            actionButton("save_cal_ORP", "Save this sheet")
+          ),
+          conditionalPanel(
+            condition = "input.sensor == 'Turbidity'",
+            numericInput("turb1_std", label = "Low Turb Standard Value", value = "0"),
+            numericInput("turb2_std", label = "High Turb Standard Value", value = "124"),
+            numericInput("turb1_pre", label = "Low Turb Pre-cal Value", value = ""),
+            numericInput("turb2_pre", label = "High Turb Pre-cal Value", value = ""),
+            numericInput("turb1_post", label = "Low Turb Post-cal Value", value = ""),
+            numericInput("turb2_post", label = "High Turb Post-cal Value", value = ""),
+            actionButton("validate_turb", "Validate measurements"),
+            actionButton("save_cal_turb", "Save this sheet")
+          ),
+          conditionalPanel(
+            condition = "input.sensor == 'Temperature'",
+            textInput("temp_reference_desc", label = "Temp Reference Type", value = "Lab thermometer"),
+            numericInput("temp_reference", label = "Reference Temp", value = ""),
+            numericInput("temp_observed", label = "Sensor Temp", value = ""),
+            actionButton("validate_temp", "Validate measurements"),
+            actionButton("save_cal_temp", "Save this sheet")
+          ),
+          conditionalPanel(
+            condition = "input.sensor == 'Conductivity'",
+            numericInput("SpC1_std", label = "SpC Low-Range Standard", value = "0"),
+            numericInput("SpC1_pre", label = "SpC Low-Range Pre-Cal Value", value = ""),
+            numericInput("SpC1_post", label = "SpC Low-Range Post-Cal Value", value = ""),
+            numericInput("SpC2_std", label = "SpC High-Range Standard", value = "1413"),
+            numericInput("SpC2_pre", label = "SpC High-Range Pre-Cal Value", value = ""),
+            numericInput("SpC2_post", label = "SpC High-Range Post-Cal Value", value = ""),
+            actionButton("validate_SpC", "Validate measurements"),
+            actionButton("save_cal_SpC", "Save this sheet")
+          ),
+          conditionalPanel(
+            condition = "input.sensor == 'DO'",
+            numericInput("baro_press_pre", label = "Baro Pressure Pre-Cal", value = ""),
+            numericInput("baro_press_post", label = "Baro Pressure Post-Cal", value = ""),
+            numericInput("DO_pre", label = "DO Pre-Cal mg/L", value = ""),
+            numericInput("DO_post", label = "DO Post-Cal mg/L", value = ""),
+            actionButton("validate_DO", "Validate measurements"),
+            actionButton("save_cal_DO", "Save this sheet")
+          ),
+          conditionalPanel(
+            condition = "input.sensor == 'Depth'",
+            radioButtons(inputId = "depth_check_ok", label = "Depth Sensor Output Near 0 or as Expected?", choiceNames = c("FALSE", "TRUE"), choiceValues = c("FALSE", "TRUE")),
+            actionButton("validate_depth", "Validate measurements"),
+            actionButton("save_cal_depth", "Save this sheet")
+          ),
+
+          actionButton("submit_btn", "Submit Calibration Data")
+        ),
+
+        # Output message
+        mainPanel(
+          tableOutput("calibration_table"),
+          textOutput("message")
+        )
+      )
+    )
+  )
+}
+
+#' Add external Resources to the Application
+#'
+#' This function is internally used to add external
+#' resources inside the Shiny application.
+#'
+#' @import shiny
+#' @importFrom golem add_resource_path activate_js favicon bundle_resources
+#' @noRd
+golem_add_external_resources <- function() {
+  add_resource_path(
+    "www",
+    app_sys("app/www")
+  )
+
+  tags$head(
+    favicon(),
+    bundle_resources(
+      path = app_sys("app/www"),
+      app_title = "WRBcalibrates"
+    ),
+    # Add here other external resources
+    # for example, you can add shinyalert::useShinyalert()
+    shinyjs::useShinyjs()
+  )
+}
