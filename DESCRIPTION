@@ -4,7 +4,7 @@ Version: 0.0.0.9000
 Authors@R: 
     person("Ghislain", "de Laplante", , "ghislain.delaplante@yukon.ca", role = c("cre", "aut"))
 Description: App to save instrument calibration data.
-License: MIT + file LICENSE
+License: AGPL (>= 3)
 Imports: 
     config,
     emayili,
