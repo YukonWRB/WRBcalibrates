@@ -5,9 +5,7 @@ account: ghislain-test
 server: shinyapps.io
 hostUrl: https://api.shinyapps.io/v1
 appId: 8776285
-bundleId: 7055054
+bundleId: 7076251
 url: https://ghislain-test.shinyapps.io/WRBcalibrates/
-when: 1680740144.88283
-lastSyncTime: 1680740144.88283
-asMultiple: FALSE
-asStatic: FALSE
+when: 1681231082.73514
+lastSyncTime: 1681231082.73517

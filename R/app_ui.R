@@ -40,7 +40,16 @@ app_ui <- function(request) {
         sidebarPanel(
           # Questions
           selectInput("sensor",
-                      label = "Select Sensor Type", choices = c("Temperature", "pH", "ORP", "Conductivity", "Turbidity", "DO", "Depth")),
+                      label = "Select Sensor Type", choices = c("Basic info", "Temperature", "Conductivity", "pH", "ORP", "Turbidity", "DO", "Depth")),
+          conditionalPanel(
+            condition = "input.sensor == 'Basic info'",
+            textInput("observer", label = "Calibrator name", value = ""),
+            dateInput("obs_date", label = "Calibration date"),
+            shinyTime::timeInput("obs_time", label = "Calibration time MST", value = .POSIXct(Sys.time(), tz = "MST"), seconds = FALSE, minute.steps = 30),
+            textInput("ID_sensor_holder", label = "Logger/bulkhead/sonde serial #", value = ""),
+            textInput("ID_handheld_meter", label = "Handheld serial # (if applicable)", value = "NA"),
+            actionButton("save_basic_info", "Save this sheet")
+          ),
           conditionalPanel(
             condition = "input.sensor == 'pH'",
             numericInput("pH1_std", label = "Low pH solution value", value = "4"),

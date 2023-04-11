@@ -65,8 +65,8 @@ db_create <- function(path, overwrite = FALSE) {
                  "CREATE TABLE calibrations (
           obs_datetime TEXT NOT NULL,
           observer TEXT NOT NULL,
-          ID_sensor_holder INTEGER NOT NULL,
-          ID_meter INTEGER,
+          ID_sensor_holder TEXT NOT NULL,
+          ID_handheld_meter TEXT,
           temp_reference_desc TEXT,
           temp_reference NUMERIC,
           temp_observed NUMERIC,

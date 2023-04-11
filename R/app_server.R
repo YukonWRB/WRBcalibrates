@@ -37,7 +37,7 @@ app_server <- function(input, output, session) {
 
   validation_check <- reactiveValues()
   calibration_data <- reactiveValues()
-  calibration_data$complete <- FALSE #FALSE means survey has not been sent and can be restarted.
+  #calibration_data$complete <- FALSE #FALSE means survey has not been sent and can be restarted.
   send_table <- reactiveValues()
 
   validation_check$pH <- FALSE
@@ -119,7 +119,7 @@ app_server <- function(input, output, session) {
       if (warn_ph_post){
         shinyalert::shinyalert(title = "Some of your post calibration pH values are > 0.1 units from their standards! Check your inputs.", type = "warning")
       }
-      if(warn_mv_post){
+      if (warn_mv_post){
         shinyalert::shinyalert(title = "Some of your post calibration mV values are outside of the valid range!", text = "Re-check your measurements, and if the problem persists consider replacing the electrode (step 1) or entire sensor (last resort). ", type = "warning")
       }
       validation_check$pH <- TRUE
@@ -278,6 +278,40 @@ app_server <- function(input, output, session) {
   # Populate data.frames for calibration data
   send_table$saved <- data.frame("Saved Calibrations" = "Nothing saved yet", check.names = FALSE)
 
+  observeEvent(input$save_basic_info, {
+    #Check length of observer, sensor holder, handheld holder
+    validation_check$basic <- TRUE
+    if (nchar(input$observer) < 2){
+      validation_check$basic <- FALSE
+      shinyalert::shinyalert(title = "Fill in the calibrator name", type = "error", timer = 2000)
+    }
+    if (nchar(input$ID_sensor_holder) < 4){
+      validation_check$basic <- FALSE
+      shinyalert::shinyalert(title = "Fill in the logger/bulkhead serial #", type = "error", timer = 2000)
+    }
+    if (input$ID_handheld_meter == "NA"){
+      shinyalert::shinyalert(title = "Warning: no handheld specified", text = "Handheld only necessary with handheld/bulkhead combos; sondes and loggers are self-contain for calibrations.", type = "warning")
+    }
+
+    if (validation_check$basic){
+      obs_date <- input$obs_date
+      obs_time <- input$obs_time
+      obs_datetime <- as.POSIXct(paste0(as.character(obs_date), " ", as.character(obs_time)))
+      calibration_data$basic <- data.frame(observer = input$observer,
+                                           obs_datetime = obs_datetime,
+                                           ID_sensor_holder = input$ID_sensor_holder,
+                                           ID_handheld_metr = input$ID_handheld_meter)
+      if (send_table$saved[1,1] == "Nothing saved yet"){
+        send_table$saved[1,1] <- "Basic_info"
+      } else if (!("Basic_info" %in% send_table$saved[ ,1])) {
+        send_table$saved[nrow(send_table$saved)+1,1] <- "Basic_info"
+      } else if ("Basic_info" %in% send_table$saved[ ,1]){
+        shinyalert::shinyalert(title = "Basic info overwritten", type = "success", timer = 2000)
+      }
+      shinyalert::shinyalert(title = "Basic info saved", type = "success", timer = 2000)
+    }
+  })
+
   observeEvent(input$save_cal_pH, {
     if (validation_check$pH){
       calibration_data$pH <- data.frame(pH1_std = input$pH1_std,
@@ -419,6 +453,10 @@ app_server <- function(input, output, session) {
     if (send_table$saved[1,1] == "Nothing saved yet"){
       shinyalert::shinyalert(title = "There is no calibration information to send yet!!!",
                  type = "error")
+    } else if (!("Basic_info" %in% send_table$saved[ ,1])){
+      shinyalert::shinyalert(title = "There is no basic information yet!!!", text = "Fill in your name, calibration time and date, and required serial numbers.", type = "error")
+    } else if (!("Temperature calibration" %in% send_table$saved[ ,1])){
+      shinyalert::shinyalert(title = "Temperature calibration is mandatory", text = "If you've filled it in already you probably forgot to save it!", type = "error")
     } else {
       # Submit the calibration.
       shinyalert::shinyalert(title = "Standby... sending data",type = "info")
@@ -443,7 +481,7 @@ app_server <- function(input, output, session) {
                  type = "success", immediate = TRUE)
 
       #if send was successful, calibration_data$complete changes to TRUE. This way the past survey is not listed as "incomplete".
-      calibration_data$complete <- TRUE
+      #calibration_data$complete <- TRUE
       #save calibration_data locally again
       #TODO: finish this part
     }
