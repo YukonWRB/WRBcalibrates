@@ -12,6 +12,8 @@ Imports:
     DBI,
     emayili,
     golem,
+    googledrive,
+    googlesheets4,
     lifecycle,
     magrittr,
     RSQLite,

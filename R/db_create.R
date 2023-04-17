@@ -37,28 +37,28 @@ db_create <- function(path, overwrite = FALSE) {
           model TEXT NOT NULL,
           type TEXT NOT NULL,
           serial_no TEXT NOT NULL,
-          asset_tag TEXT,
           alias TEXT,
           has_sensors TEXT NOT NULL,
           date_in_service TEXT,
-          date_purchased TEXT)")
+          date_purchased TEXT,
+          date_retired TEXT)")
 
-  # Create "sensor_arrays" table
-  DBI::dbExecute(con,
-                 "CREATE TABLE sensor_arrays (
-          ID INTEGER NOT NULL,
-          obs_datetime TEXT NOT NULL,
-          sensor1 TEXT NOT NULL,
-          sensor2 TEXT,
-          sensor3 TEXT,
-          sensor4 TEXT,
-          sensor5 TEXT,
-          sensor6 TEXT,
-          sensor7 TEXT,
-          sensor8 TEXT,
-          PRIMARY KEY (ID, obs_datetime)
-          FOREIGN KEY (ID) REFERENCES instruments(ID))
-          WITHOUT ROWID")
+  # # Create "sensor_arrays" table
+  # DBI::dbExecute(con,
+  #                "CREATE TABLE sensor_arrays (
+  #         ID INTEGER NOT NULL,
+  #         obs_datetime TEXT NOT NULL,
+  #         sensor1 TEXT NOT NULL,
+  #         sensor2 TEXT,
+  #         sensor3 TEXT,
+  #         sensor4 TEXT,
+  #         sensor5 TEXT,
+  #         sensor6 TEXT,
+  #         sensor7 TEXT,
+  #         sensor8 TEXT,
+  #         PRIMARY KEY (ID, obs_datetime)
+  #         FOREIGN KEY (ID) REFERENCES instruments(ID))
+  #         WITHOUT ROWID")
 
   # Create "calibrations" table
   DBI::dbExecute(con,
@@ -98,13 +98,14 @@ db_create <- function(path, overwrite = FALSE) {
           turb1_pre NUMERIC,
           turb1_post NUMERIC,
           turb2_std NUMERIC,
-          turb2_pre_val NUMERIC,
-          turb2_post_val NUMERIC,
+          turb2_pre NUMERIC,
+          turb2_post NUMERIC,
           baro_press_pre NUMERIC,
           baro_press_post NUMERIC,
           DO_pre NUMERIC,
           DO_post NUMERIC,
           depth_check_ok TEXT,
+          depth_changes_ok TEXT,
           PRIMARY KEY (ID_sensor_holder, obs_datetime)
           FOREIGN KEY (ID_sensor_holder) REFERENCES instruments(ID)
           FOREIGN KEY (ID_meter) REFERENCES instruments(ID))")

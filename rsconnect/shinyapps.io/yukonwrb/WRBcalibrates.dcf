@@ -1,0 +1,13 @@
+name: WRBcalibrates
+title: WRBcalibrates
+username:
+account: yukonwrb
+server: shinyapps.io
+hostUrl: https://api.shinyapps.io/v1
+appId: 8847835
+bundleId: 7094546
+url: https://yukonwrb.shinyapps.io/WRBcalibrates/
+when: 1681613751.83443
+lastSyncTime: 1681613751.83444
+asMultiple: FALSE
+asStatic: FALSE

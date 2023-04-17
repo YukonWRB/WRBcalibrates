@@ -40,22 +40,29 @@ app_ui <- function(request) {
         sidebarPanel(
           # Questions
           selectInput("sensor",
-                      label = "Select Sensor Type", choices = c("Basic info", "Temperature", "Conductivity", "pH", "ORP", "Turbidity", "DO", "Depth")),
+                      label = "Choose your adventure!", choices = c("Basic calibration info", "Temperature calibration", "Conductivity calibration", "pH calibration", "ORP calibration", "Turbidity calibration", "DO calibration", "Depth calibration", "View unfinished calibrations")),
           conditionalPanel(
-            condition = "input.sensor == 'Basic info'",
+            condition = "input.sensor == 'View unfinished calibrations'",
+            numericInput("restart_index", label = "Select a calibration by index number", value = 0),
+            actionButton("restart_calibration", "Restart selected calibration"),
+            actionButton("delete_calibration", "Delete selected calibration")
+          ),
+          conditionalPanel(
+            condition = "input.sensor == 'Basic calibration info'",
             textInput("observer", label = "Calibrator name", value = ""),
             dateInput("obs_date", label = "Calibration date"),
             shinyTime::timeInput("obs_time", label = "Calibration time MST", value = .POSIXct(Sys.time(), tz = "MST"), seconds = FALSE, minute.steps = 30),
             textInput("ID_sensor_holder", label = "Logger/bulkhead/sonde serial #", value = ""),
             textInput("ID_handheld_meter", label = "Handheld serial # (if applicable)", value = "NA"),
-            actionButton("save_basic_info", "Save this sheet")
+            actionButton("save_basic_info", "Save this sheet"),
+            actionButton("submit_btn", "Finalize Calibration")
           ),
           conditionalPanel(
-            condition = "input.sensor == 'pH'",
+            condition = "input.sensor == 'pH calibration'",
             numericInput("pH1_std", label = "Low pH solution value", value = "4"),
             numericInput("pH2_std", label = "Neutral pH solution value", value = "7"),
             numericInput("pH3_std", label = "High pH solution value", value = "10"),
-            numericInput("pH1_pre_val", label = paste0("pH 4 Pre-Cal Value"), value = ""),
+            numericInput("pH1_pre_val", label = "pH 4 Pre-Cal Value", value = ""),
             numericInput("pH1_pre_mV", label = "pH 4 Pre-Cal mV", value = ""),
             numericInput("pH2_pre_val", label = "pH 7 Pre-Cal Value", value = ""),
             numericInput("pH2_pre_mV", label = "pH 7 Pre-Cal mV", value = ""),
@@ -68,18 +75,20 @@ app_ui <- function(request) {
             numericInput("pH3_post_val", label = "pH 10 Post-Cal Value", value = ""),
             numericInput("pH3_post_mV", label = "pH 10 Post-Cal mV", value = ""),
             actionButton("validate_pH", "Validate measurements"),
-            actionButton("save_cal_pH", "Save this sheet")
+            actionButton("save_cal_pH", "Save this sheet"),
+            actionButton("submit_btn", "Finalize Calibration")
           ),
           conditionalPanel(
-            condition = "input.sensor == 'ORP'",
+            condition = "input.sensor == 'ORP calibration'",
             numericInput("orp_std", label = "ORP Standard solution mV", value = ""),
             numericInput("orp_pre_mV", label = "ORP mV Pre-Cal Value", value = ""),
             numericInput("orp_post_mV", label = "ORP mV Post-Cal Value", value = ""),
             actionButton("validate_ORP", "Validate measurements"),
-            actionButton("save_cal_ORP", "Save this sheet")
+            actionButton("save_cal_ORP", "Save this sheet"),
+            actionButton("submit_btn", "Finalize Calibration")
           ),
           conditionalPanel(
-            condition = "input.sensor == 'Turbidity'",
+            condition = "input.sensor == 'Turbidity calibration'",
             numericInput("turb1_std", label = "Low Turb Standard Value", value = "0"),
             numericInput("turb2_std", label = "High Turb Standard Value", value = "124"),
             numericInput("turb1_pre", label = "Low Turb Pre-cal Value", value = ""),
@@ -87,18 +96,20 @@ app_ui <- function(request) {
             numericInput("turb1_post", label = "Low Turb Post-cal Value", value = ""),
             numericInput("turb2_post", label = "High Turb Post-cal Value", value = ""),
             actionButton("validate_turb", "Validate measurements"),
-            actionButton("save_cal_turb", "Save this sheet")
+            actionButton("save_cal_turb", "Save this sheet"),
+            actionButton("submit_btn", "Finalize Calibration")
           ),
           conditionalPanel(
-            condition = "input.sensor == 'Temperature'",
+            condition = "input.sensor == 'Temperature calibration'",
             textInput("temp_reference_desc", label = "Temp Reference Type", value = "Lab thermometer"),
             numericInput("temp_reference", label = "Reference Temp", value = ""),
             numericInput("temp_observed", label = "Sensor Temp", value = ""),
             actionButton("validate_temp", "Validate measurements"),
-            actionButton("save_cal_temp", "Save this sheet")
+            actionButton("save_cal_temp", "Save this sheet"),
+            actionButton("submit_btn", "Finalize Calibration")
           ),
           conditionalPanel(
-            condition = "input.sensor == 'Conductivity'",
+            condition = "input.sensor == 'Conductivity calibration'",
             numericInput("SpC1_std", label = "SpC Low-Range Standard", value = "0"),
             numericInput("SpC1_pre", label = "SpC Low-Range Pre-Cal Value", value = ""),
             numericInput("SpC1_post", label = "SpC Low-Range Post-Cal Value", value = ""),
@@ -106,31 +117,39 @@ app_ui <- function(request) {
             numericInput("SpC2_pre", label = "SpC High-Range Pre-Cal Value", value = ""),
             numericInput("SpC2_post", label = "SpC High-Range Post-Cal Value", value = ""),
             actionButton("validate_SpC", "Validate measurements"),
-            actionButton("save_cal_SpC", "Save this sheet")
+            actionButton("save_cal_SpC", "Save this sheet"),
+            actionButton("submit_btn", "Finalize Calibration")
           ),
           conditionalPanel(
-            condition = "input.sensor == 'DO'",
+            condition = "input.sensor == 'DO calibration'",
             numericInput("baro_press_pre", label = "Baro Pressure Pre-Cal", value = ""),
             numericInput("baro_press_post", label = "Baro Pressure Post-Cal", value = ""),
             numericInput("DO_pre", label = "DO Pre-Cal mg/L", value = ""),
             numericInput("DO_post", label = "DO Post-Cal mg/L", value = ""),
             actionButton("validate_DO", "Validate measurements"),
-            actionButton("save_cal_DO", "Save this sheet")
+            actionButton("save_cal_DO", "Save this sheet"),
+            actionButton("submit_btn", "Finalize Calibration")
           ),
           conditionalPanel(
-            condition = "input.sensor == 'Depth'",
-            radioButtons(inputId = "depth_check_ok", label = "Depth Sensor Output Near 0 or as Expected?", choiceNames = c("FALSE", "TRUE"), choiceValues = c("FALSE", "TRUE")),
+            condition = "input.sensor == 'Depth calibration'",
+            radioButtons(inputId = "depth_check_ok", label = "Depth Sensor Output Near 0 or as Expected in air?", choiceNames = c("FALSE", "TRUE"), choiceValues = c("FALSE", "TRUE")),
+            radioButtons(inputId = "depth_changes_ok", label = "Depth Sensor Output Changes as Expected with depth?", choiceNames = c("Not Checked", "FALSE", "TRUE"), choiceValues = c("Not Checked", "FALSE", "TRUE")),
             actionButton("validate_depth", "Validate measurements"),
-            actionButton("save_cal_depth", "Save this sheet")
+            actionButton("save_cal_depth", "Save this sheet"),
+            actionButton("submit_btn", "Finalize Calibration")
           ),
-
-          actionButton("submit_btn", "Submit Calibration Data")
         ),
 
         # Output message
         mainPanel(
-          tableOutput("calibration_table"),
-          textOutput("message")
+          conditionalPanel(
+            condition = "input.sensor != 'View unfinished calibrations'",
+            tableOutput("calibration_table")
+          ),
+          conditionalPanel(
+            condition = "input.sensor == 'View unfinished calibrations'",
+            tableOutput("incomplete_table")
+          )
         )
       )
     )
