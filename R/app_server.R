@@ -1,4 +1,4 @@
-#' The application server-side
+#' The#' The application server-side
 #'
 #' @param input,output,session Internal parameters for {shiny}.
 #'     DO NOT REMOVE.
@@ -11,6 +11,8 @@ app_server <- function(input, output, session) {
   # create a few containers
   validation_check <- reactiveValues()
   calibration_data <- reactiveValues()
+  restarted <- reactiveValues()
+  restarted$restarted <- FALSE
   instruments_data <- reactiveValues()
   send_table <- reactiveValues()
   messages <- reactiveValues()
@@ -51,8 +53,14 @@ app_server <- function(input, output, session) {
   })
 
   #set-up to connect to google drive using API
-  googledrive::drive_auth(cache = "app/secret", email = "wrbcalibrates@gmail.com")
-  googlesheets4::gs4_auth(token = googledrive::drive_token())
+  # googledrive::drive_deauth()
+  # googlesheets4::gs4_deauth()
+  # googlesheets4::gs4_auth(path = "app/secret/drive_secret.json", email = "wrbcalibrates@gmail.com")
+  # googledrive::drive_auth(path = "app/secret/drive_secret.json", email = "wrbcalibrates@gmail.com")
+  # googlesheets4::gs4_auth(cache = ".secrets") #Run locally FIRST TIME ONLY to allow the email to work
+  # googledrive::drive_auth(cache = ".secrets") #Run locally FIRST TIME ONLY to allow the email to work
+  googlesheets4::gs4_auth(cache = ".secrets", email = TRUE, use_oob = TRUE) #Run after the above two lines are run once.
+  googledrive::drive_auth(cache = ".secrets", email = TRUE, use_oob = TRUE) #Run after the above two lines are run once.
   calibrations_id <- googledrive::drive_get("calibrations/calibrations")$id
   instruments_id <- googledrive::drive_get("calibrations/instruments")$id
   instruments_sheet <- googlesheets4::read_sheet(instruments_id, sheet = "instruments")
@@ -200,7 +208,7 @@ app_server <- function(input, output, session) {
       shinyalert::shinyalert("Loading old calibration", text = "Please wait to be taken to the calibration section", type = "info", timer = 5000)
       incomplete_ID <- as.numeric(incomplete_observations[restart_value , 1])
       calibration_data$next_id <- incomplete_ID
-
+      # Reset the basic fields according to recovered info
       updateTextInput(session, "observer", value = incomplete_observations[restart_value , "observer"]$observer)
       updateDateInput(session, "obs_date", value = as.Date(incomplete_observations[restart_value , "obs_date"]$obs_date))
       shinyTime::updateTimeInput(session, "obs_time", value = as.POSIXct(incomplete_observations[restart_value , "obs_time"]$obs_time))
@@ -286,9 +294,13 @@ app_server <- function(input, output, session) {
       }
       updateSelectInput(session, "first_selection", selected = "Calibrate") #Changing this selection brings the user right to the calibration page
       colnames(send_table$saved) <- "Saved calibrations (this session)" #Update the name for clarity since we're restarting a calibration
+      output$saved <- renderTable({ # Display local calibrations tables with new name
+        send_table$saved
+      })
       output$restart_table <- renderTable({ # Display remotely saved calibrations tables
         send_table$restarted_cal
       })
+      restarted$restarted <- TRUE
     }
   })
 
@@ -297,7 +309,8 @@ app_server <- function(input, output, session) {
     if (delete_value == 0){
       shinyalert::shinyalert("0 is not a valid selection!", type = "error")
     } else {
-      shinyalert::shinyalert("Deleting old calibration", type = "info", timer = 3000)
+
+      shinyalert::shinyalert("Deleting old calibration", type = "info")
       delete_ID <- as.numeric(incomplete_observations[delete_value , 1])
       calibration_data$next_id <- delete_ID
       calibration_sheets <- googlesheets4::sheet_names(calibrations_id)
@@ -308,6 +321,26 @@ app_server <- function(input, output, session) {
           googlesheets4::range_clear(calibrations_id, sheet = i,range = paste0(row, ":", row))
         }
       }
+      complete$incomplete <- complete$incomplete[!complete$incomplete$Index == delete_value ,]
+      if (nrow(complete$incomplete) == 0) {
+        complete$incomplete <- data.frame("Index" = "0",
+                                          "Calibrator" = "No unsaved calibrations!",
+                                          "date/time" = "No unsaved calibrations!",
+                                          check.names = FALSE)
+      }
+      output$incomplete_table <- renderTable({  #render the incomplete table again
+        complete$incomplete
+      })
+      #reset internal markers of completness
+      complete$basic <- FALSE
+      complete$temperature <- FALSE
+      complete$SpC <- FALSE
+      complete$pH <- FALSE
+      complete$orp <- FALSE
+      complete$turbidity <- FALSE
+      complete$DO <- FALSE
+      complete$depth <- FALSE
+      shinyalert::shinyalert("Deleted", type = "success", immediate = TRUE, timer = 2000)
     }
   })
 
@@ -594,6 +627,9 @@ app_server <- function(input, output, session) {
       } else if (!("Basic info" %in% send_table$saved[ ,1])) {
         send_table$saved[nrow(send_table$saved)+1,1] <- "Basic info"
       }
+      output$saved <- renderTable({ # Display local calibrations table
+        send_table$saved
+      })
     }
   })
 
@@ -649,6 +685,9 @@ app_server <- function(input, output, session) {
       } else if (!("pH calibration" %in% send_table$saved[ ,1])) {
         send_table$saved[nrow(send_table$saved)+1,1] <- "pH calibration"
       }
+      output$saved <- renderTable({ # Display local calibrations table
+        send_table$saved
+      })
     } else {
       shinyalert::shinyalert(title = "Validate your measurements first!", type = "error", timer = 2000)
     }
@@ -676,9 +715,23 @@ app_server <- function(input, output, session) {
     updateNumericInput(session, "pH3_post_val", label = "pH 10 Post-Cal Value", value = "")
     updateNumericInput(session, "pH3_post_mV", label = "pH 10 Post-Cal mV", value = "")
     #remove from display tables
-    send_table$saved <- send_table$saved[send_table$saved != "pH calibration"]
-    send_table$restarted_cal <- send_table$restarted_cal[send_table$saved != "pH calibration"]
+    send_table$saved <- send_table$saved[send_table$saved[1] != "pH calibration" , , drop=FALSE]
+    send_table$restarted_cal <- send_table$restarted_cal[send_table$restarted_cal[1] != "pH calibration" , , drop=FALSE]
+    if (nrow(send_table$saved) == 0){
+      if (!restarted$restarted){
+        send_table$saved <- data.frame("Saved calibrations" = "Nothing saved yet", check.names = FALSE)
+      } else {
+        send_table$saved <- data.frame("Saved calibrations (this session)" = "Nothing saved yet", check.names = FALSE)
+      }
+    }
     shinyalert::shinyalert("Deleted", type = "success", timer = 2000, immediate = TRUE)
+    output$saved <- renderTable({ # Display local calibrations table
+      send_table$saved
+    })
+    output$restart_table <- renderTable({ # Display remotely saved calibrations tables
+      send_table$restarted_cal
+    })
+    complete$pH <- FALSE
   })
 
   ### Save/Delete temperature
@@ -691,6 +744,7 @@ app_server <- function(input, output, session) {
                                           temp_observed = input$temp_observed)
       if (!complete$temperature){
         googlesheets4::sheet_append(calibrations_id, sheet="temperature", data = calibration_data$temp)
+        complete$temperature <- TRUE
         shinyjs::show("delete_temp")
       } else {
         temp_sheet <- googlesheets4::read_sheet(calibrations_id, sheet = "temperature")
@@ -720,6 +774,9 @@ app_server <- function(input, output, session) {
       } else if (!("Temperature calibration" %in% send_table$saved[ ,1])) {
         send_table$saved[nrow(send_table$saved)+1,1] <- "Temperature calibration"
       }
+      output$saved <- renderTable({ # Display local calibrations table
+        send_table$saved
+      })
     } else {
       shinyalert::shinyalert(title = "Validate your measurements first!", type = "error", timer = 2000)
     }
@@ -734,9 +791,23 @@ app_server <- function(input, output, session) {
     updateNumericInput(session, "temp_reference", label = "Reference Temp", value = "")
     updateNumericInput(session, "temp_observed", label = "Sensor Temp", value = "")
     #remove from display tables
-    send_table$saved <- send_table$saved[send_table$saved != "Temperature calibration"]
-    send_table$restarted_cal <- send_table$restarted_cal[send_table$saved != "Temperature calibration"]
+    send_table$saved <- send_table$saved[send_table$saved[1] != "Temperature calibration" , , drop=FALSE] #drop = FALSE is necessary to return a table and not a vector, which is default if returning only one col
+    send_table$restarted_cal <- send_table$restarted_cal[send_table$restarted_cal[1] != "Temperature calibration" , , drop=FALSE]
+    if (nrow(send_table$saved) == 0){
+      if (!restarted$restarted){
+        send_table$saved <- data.frame("Saved calibrations" = "Nothing saved yet", check.names = FALSE)
+      } else {
+        send_table$saved <- data.frame("Saved calibrations (this session)" = "Nothing saved yet", check.names = FALSE)
+      }
+    }
     shinyalert::shinyalert("Deleted", type = "success", timer = 2000, immediate = TRUE)
+    output$saved <- renderTable({ # Display local calibrations table
+      send_table$saved
+    })
+    output$restart_table <- renderTable({ # Display remotely saved calibrations tables
+      send_table$restarted_cal
+    })
+    complete$temperature <- FALSE
   })
 
   ### Save/Delete ORP
@@ -779,23 +850,40 @@ app_server <- function(input, output, session) {
       } else if (!("ORP calibration" %in% send_table$saved[ ,1])) {
         send_table$saved[nrow(send_table$saved)+1,1] <- "ORP calibration"
       }
+      output$saved <- renderTable({ # Display local calibrations table
+        send_table$saved
+      })
     } else {
       shinyalert::shinyalert(title = "Validate your measurements first!", type = "error", timer = 2000)
     }
   })
   observeEvent(input$delete_orp, {
     shinyalert::shinyalert("Deleting...", type = "info")
-    orp_sheet <- googlesheets4::read_sheet(calibrations_id, sheet = "orp")
+    orp_sheet <- googlesheets4::read_sheet(calibrations_id, sheet = "ORP")
     row <- which(orp_sheet$observation_ID == calibration_data$next_id)+1
-    googlesheets4::range_clear(calibrations_id, sheet = "orp", range = paste0(row, ":", row))
+    googlesheets4::range_clear(calibrations_id, sheet = "ORP", range = paste0(row, ":", row))
     #reset the fields
     updateNumericInput(session, "orp_std", label = "ORP Standard solution mV", value = "")
     updateNumericInput(session, "orp_pre_mV", label = "ORP mV Pre-Cal Value", value = "")
     updateNumericInput(session, "orp_post_mV", label = "ORP mV Post-Cal Value", value = "")
     #remove from display tables
-    send_table$saved <- send_table$saved[send_table$saved != "ORP calibration"]
-    send_table$restarted_cal <- send_table$restarted_cal[send_table$saved != "ORP calibration"]
+    send_table$saved <- send_table$saved[send_table$saved[1] != "ORP calibration" , , drop=FALSE]
+    send_table$restarted_cal <- send_table$restarted_cal[send_table$restarted_cal[1] != "ORP calibration" , , drop=FALSE]
+    if (nrow(send_table$saved) == 0){
+      if (!restarted$restarted){
+        send_table$saved <- data.frame("Saved calibrations" = "Nothing saved yet", check.names = FALSE)
+      } else {
+        send_table$saved <- data.frame("Saved calibrations (this session)" = "Nothing saved yet", check.names = FALSE)
+      }
+    }
     shinyalert::shinyalert("Deleted", type = "success", timer = 2000, immediate = TRUE)
+    output$saved <- renderTable({ # Display local calibrations table
+      send_table$saved
+    })
+    output$restart_table <- renderTable({ # Display remotely saved calibrations tables
+      send_table$restarted_cal
+    })
+    complete$orp <- FALSE
   })
 
   ### Save/Delete SpC
@@ -841,6 +929,9 @@ app_server <- function(input, output, session) {
       } else if (!("Conductivity calibration" %in% send_table$saved[ ,1])) {
         send_table$saved[nrow(send_table$saved)+1,1] <- "Conductivity calibration"
       }
+      output$saved <- renderTable({ # Display local calibrations table
+        send_table$saved
+      })
     } else {
       shinyalert::shinyalert(title = "Validate your measurements first!", type = "error", timer = 2000)
     }
@@ -858,9 +949,23 @@ app_server <- function(input, output, session) {
     updateNumericInput(session, "SpC2_pre", label = "SpC High-Range Pre-Cal Value", value = "")
     updateNumericInput(session, "SpC2_post", label = "SpC High-Range Post-Cal Value", value = "")
     #remove from display tables
-    send_table$saved <- send_table$saved[send_table$saved != "Conductivity calibration"]
-    send_table$restarted_cal <- send_table$restarted_cal[send_table$saved != "Conductivity calibration"]
+    send_table$saved <- send_table$saved[send_table$saved[1] != "Conductivity calibration", , drop=FALSE]
+    send_table$restarted_cal <- send_table$restarted_cal[send_table$restarted_cal[1] != "Conductivity calibration" , , drop = FALSE]
+    if (nrow(send_table$saved) == 0){
+      if (!restarted$restarted){
+        send_table$saved <- data.frame("Saved calibrations" = "Nothing saved yet", check.names = FALSE)
+      } else {
+        send_table$saved <- data.frame("Saved calibrations (this session)" = "Nothing saved yet", check.names = FALSE)
+      }
+    }
     shinyalert::shinyalert("Deleted", type = "success", timer = 2000, immediate = TRUE)
+    output$saved <- renderTable({ # Display local calibrations table
+      send_table$saved
+    })
+    output$restart_table <- renderTable({ # Display remotely saved calibrations tables
+      send_table$restarted_cal
+    })
+    complete$SpC <- FALSE
   })
 
   ### Save/Delete turbidity
@@ -906,6 +1011,9 @@ app_server <- function(input, output, session) {
       } else if (!("Turbidity calibration" %in% send_table$saved[ ,1])) {
         send_table$saved[nrow(send_table$saved)+1,1] <- "Turbidity calibration"
       }
+      output$saved <- renderTable({ # Display local calibrations table
+        send_table$saved
+      })
     } else {
       shinyalert::shinyalert(title = "Validate your measurements first!", type = "error", timer = 2000)
     }
@@ -923,9 +1031,23 @@ app_server <- function(input, output, session) {
     updateNumericInput(session, "turb1_post", label = "Low Turb Post-cal Value", value = "")
     updateNumericInput(session, "turb2_post", label = "High Turb Post-cal Value", value = "")
     #remove from display tables
-    send_table$saved <- send_table$saved[send_table$saved != "Turbidity calibration"]
-    send_table$restarted_cal <- send_table$restarted_cal[send_table$saved != "Turbidity calibration"]
+    send_table$saved <- send_table$saved[send_table$saved[1] != "Turbidity calibration" , , drop=FALSE]
+    send_table$restarted_cal <- send_table$restarted_cal[send_table$restarted_cal[1] != "Turbidity calibration" , , drop=FALSE]
+    if (nrow(send_table$saved) == 0){
+      if (!restarted$restarted){
+        send_table$saved <- data.frame("Saved calibrations" = "Nothing saved yet", check.names = FALSE)
+      } else {
+        send_table$saved <- data.frame("Saved calibrations (this session)" = "Nothing saved yet", check.names = FALSE)
+      }
+    }
     shinyalert::shinyalert("Deleted", type = "success", timer = 2000, immediate = TRUE)
+    output$saved <- renderTable({ # Display local calibrations table
+      send_table$saved
+    })
+    output$restart_table <- renderTable({ # Display remotely saved calibrations tables
+      send_table$restarted_cal
+    })
+    complete$turbidity <- FALSE
   })
 
   ### Save/Delete DO
@@ -969,6 +1091,9 @@ app_server <- function(input, output, session) {
       } else if (!("DO calibration" %in% send_table$saved[ ,1])){
         send_table$saved[nrow(send_table$saved)+1,1] <- "DO calibration"
       }
+      output$saved <- renderTable({ # Display local calibrations table
+        send_table$saved
+      })
     } else {
       shinyalert::shinyalert(title = "Validate your measurements first!", type = "error", timer = 2000)
     }
@@ -984,9 +1109,23 @@ app_server <- function(input, output, session) {
     updateNumericInput(session, "DO_pre", label = "DO Pre-Cal mg/L", value = "")
     updateNumericInput(session, "DO_post", label = "DO Post-Cal mg/L", value = "")
     #remove from display tables
-    send_table$saved <- send_table$saved[send_table$saved != "DO calibration"]
-    send_table$restarted_cal <- send_table$restarted_cal[send_table$saved != "DO calibration"]
+    send_table$saved <- send_table$saved[send_table$saved[1] != "DO calibration" , , drop=FALSE]
+    send_table$restarted_cal <- send_table$restarted_cal[send_table$restarted_cal[1] != "DO calibration" , , drop=FALSE]
+    if (nrow(send_table$saved) == 0){
+      if (!restarted$restarted){
+        send_table$saved <- data.frame("Saved calibrations" = "Nothing saved yet", check.names = FALSE)
+      } else {
+        send_table$saved <- data.frame("Saved calibrations (this session)" = "Nothing saved yet", check.names = FALSE)
+      }
+    }
     shinyalert::shinyalert("Deleted", type = "success", timer = 2000, immediate = TRUE)
+    output$saved <- renderTable({ # Display local calibrations table
+      send_table$saved
+    })
+    output$restart_table <- renderTable({ # Display remotely saved calibrations tables
+      send_table$restarted_cal
+    })
+    complete$DO <- FALSE
   })
 
   ### Save/Delete depth
@@ -1028,6 +1167,9 @@ app_server <- function(input, output, session) {
       } else if (!("Depth calibration" %in% send_table$saved[ ,1])) {
         send_table$saved[nrow(send_table$saved)+1,1] <- "Depth calibration"
       }
+      output$saved <- renderTable({ # Display local calibrations table
+        send_table$saved
+      })
     } else {
       shinyalert::shinyalert(title = "Validate your measurements first!", type = "error", timer = 2000)
     }
@@ -1041,25 +1183,27 @@ app_server <- function(input, output, session) {
     updateRadioButtons(session, inputId = "depth_check_ok", selected = "FALSE")
     updateRadioButtons(session, inputId = "depth_changes_ok", selected = "FALSE")
     #remove from display tables
-    send_table$saved <- send_table$saved[send_table$saved != "Depth calibration"]
-    send_table$restarted_cal <- send_table$restarted_cal[send_table$saved != "Depth calibration"]
+    send_table$saved <- send_table$saved[send_table$saved[1] != "Depth calibration" , , drop=FALSE]
+    send_table$restarted_cal <- send_table$restarted_cal[send_table$restarted_cal[1] != "Depth calibration" , , drop=FALSE]
+    if (nrow(send_table$saved) == 0){
+      if (!restarted$restarted){
+        send_table$saved <- data.frame("Saved calibrations" = "Nothing saved yet", check.names = FALSE)
+      } else {
+        send_table$saved <- data.frame("Saved calibrations (this session)" = "Nothing saved yet", check.names = FALSE)
+      }
+    }
     shinyalert::shinyalert("Deleted", type = "success", timer = 2000, immediate = TRUE)
+    output$saved <- renderTable({ # Display local calibrations table
+      send_table$saved
+    })
+    output$restart_table <- renderTable({ # Display remotely saved calibrations tables
+      send_table$restarted_cal
+    })
+    complete$depth <- FALSE
   })
 
-  # Function to display saved calibrations tables
-  output$calibration_table <- renderTable({
-    send_table$saved
-  })
 
-  observeEvent({
-    input$submit_btn_basic
-    input$submit_btn_ph
-    input$submit_btn_orp
-    input$submit_btn_turb
-    input$submit_btn_temp
-    input$submit_btn_do
-    input$submit_btn_depth
-    input$submit_btn_spc
+  observeEvent({input$submit_btn
   }, {
     if (!("Basic info" %in% send_table$saved[ ,1] | "Basic info" %in% send_table$restarted_cal[ ,1])){
       shinyalert::shinyalert(title = "There is no basic information yet!!!", text = "Fill in your name, calibration time and date, and required serial numbers.", type = "error")

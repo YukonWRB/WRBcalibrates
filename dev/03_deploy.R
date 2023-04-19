@@ -41,6 +41,7 @@ golem::add_dockerfile_with_renv_shinyproxy()
 
 # Deploy to Posit Connect or ShinyApps.io
 # In command line.
+# Warning! this will not publish the hidden .secret files that Google needs. Publish from the locally-running app instead.
 rsconnect::deployApp(
   appName = desc::desc_get_field("Package"),
   appTitle = desc::desc_get_field("Package"),

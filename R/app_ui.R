@@ -28,7 +28,8 @@ app_ui <- function(request) {
         tags$link(rel = "manifest", href = "manifest.json"),
         tags$link(rel = "apple-touch-icon", href = "icon.png"),
         tags$link(rel = "icon", type = "image/png", href = "icon.png"),
-        tags$script(src = "serviceworker.js", type = "text/javascript")
+        tags$script(src = "serviceworker.js", type = "text/javascript"),
+        tags$style(type='text/css', ".selectize-dropdown-content {max-height: 400px; }")
       ),
 
       shinyjs::extendShinyjs(text = jsCode, functions = c("backgroundCol")),
@@ -45,9 +46,9 @@ app_ui <- function(request) {
             selectInput("existing_serial_no", "Search existing serial numbers", choices = "New record"),
             textInput("serial_no", "New or target serial No", value = "Search first!"),
             textInput("recorder", label = "Observer name", value = ""),
-            selectInput("make", label = "Instrument make", choices = c("", "YSI", "Solinst", "HOBO/Onset", "OTT", "RBR", "Campbell Sci", "Other"), ),
+            selectInput("make", label = "Instrument make", choices = c("", "YSI", "Solinst", "HOBO/Onset", "OTT", "RBR", "Campbell Sci", "In-Situ", "Other"), ),
             textInput("model", label = "Instrument model", value = ""),
-            selectInput("type", label = "Instrument type", choices = c("", "Logger (single-param deployable)", "Sonde (multi-param deployable)", "Bulkhead (requires handheld, not deployable)", "Handheld (connects to bulkhead)", "Sensor (single/multi-param not deployable i.e. thermometer or temp/conductivity meter")), #beware if changing names that 'Handheld (connects to bulkhead)' is employed in app_server
+            selectInput("type", label = "Instrument type", choices = c("", "Logger (single-param deployable)", "Sonde (multi-param deployable)", "Bulkhead (requires handheld, not deployable)", "Handheld (connects to bulkhead)", "Sensor (single/multi-param not deployable i.e. thermometer or combo meter")), #beware if changing names that 'Handheld (connects to bulkhead)' is employed in app_server
             textInput("asset_tag", "Asset tag number", value = ""),
             dateInput("date_in_service", label = "Date in service"),
             dateInput("date_purchased", label = "Date purchased"),
@@ -187,7 +188,7 @@ app_ui <- function(request) {
           conditionalPanel(
             condition = "input.first_selection == 'Calibrate'",
             tableOutput("restart_table"),
-            tableOutput("calibration_table")
+            tableOutput("saved")
           ),
           conditionalPanel(
             condition = "input.first_selection == 'View unfinished calibrations'",

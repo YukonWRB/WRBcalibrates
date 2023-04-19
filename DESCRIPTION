@@ -10,7 +10,6 @@ BugReports: https://github.com/YukonWRB/WRBcalibrates/issues
 Imports: 
     config,
     DBI,
-    emayili,
     golem,
     googledrive,
     googlesheets4,
