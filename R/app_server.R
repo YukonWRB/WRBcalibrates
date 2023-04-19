@@ -11,6 +11,7 @@ app_server <- function(input, output, session) {
   # create a few containers
   validation_check <- reactiveValues()
   calibration_data <- reactiveValues()
+  calibration_data$restarted_id <- 0
   restarted <- reactiveValues()
   restarted$restarted <- FALSE
   instruments_data <- reactiveValues()
@@ -52,13 +53,69 @@ app_server <- function(input, output, session) {
     messages$instrument_reminder
   })
 
-  #set-up to connect to google drive using API
-  # googledrive::drive_deauth()
-  # googlesheets4::gs4_deauth()
-  # googlesheets4::gs4_auth(path = "app/secret/drive_secret.json", email = "wrbcalibrates@gmail.com")
-  # googledrive::drive_auth(path = "app/secret/drive_secret.json", email = "wrbcalibrates@gmail.com")
-  # googlesheets4::gs4_auth(cache = ".secrets") #Run locally FIRST TIME ONLY to allow the email to work
-  # googledrive::drive_auth(cache = ".secrets") #Run locally FIRST TIME ONLY to allow the email to work
+  #Create the reset functions
+  reset_basic <- function(){
+    updateTextInput(session, "observer", label = "Calibrator name", value = "")
+    updateDateInput(session, "obs_date", label = "Calibration date", value = Sys.Date())
+    shinyTime::updateTimeInput(session, "obs_time", label = "Calibration time MST", value = .POSIXct(Sys.time(), tz = "MST"))
+    updateSelectInput(session, "ID_sensor_holder", choices = instruments_data$others$serial_no)
+    updateSelectInput(session, "ID_handheld_meter", choices = c("NA", instruments_data$handhelds$serial_no))
+  }
+  reset_ph <- function(){
+    updateNumericInput(session, "pH1_std", label = "Low pH solution value", value = "4")
+    updateNumericInput(session, "pH2_std", label = "Neutral pH solution value", value = "7")
+    updateNumericInput(session, "pH3_std", label = "High pH solution value", value = "10")
+    updateNumericInput(session, "pH1_pre_val", label = "pH 4 Pre-Cal Value", value = "")
+    updateNumericInput(session, "pH1_pre_mV", label = "pH 4 Pre-Cal mV", value = "")
+    updateNumericInput(session, "pH2_pre_val", label = "pH 7 Pre-Cal Value", value = "")
+    updateNumericInput(session, "pH2_pre_mV", label = "pH 7 Pre-Cal mV", value = "")
+    updateNumericInput(session, "pH3_pre_val", label = "pH 10 Pre-Cal Value", value = "")
+    updateNumericInput(session, "pH3_pre_mV", label = "pH 10 Pre-Cal mV", value = "")
+    updateNumericInput(session, "pH1_post_val", label = "pH 4 Post-Cal Value", value = "")
+    updateNumericInput(session, "pH1_post_mV", label = "pH 4 Post-Cal mV", value = "")
+    updateNumericInput(session, "pH2_post_val", label = "pH 7 Post-Cal Value", value = "")
+    updateNumericInput(session, "pH2_post_mV", label = "pH 7 Post-Cal mV", value = "")
+    updateNumericInput(session, "pH3_post_val", label = "pH 10 Post-Cal Value", value = "")
+    updateNumericInput(session, "pH3_post_mV", label = "pH 10 Post-Cal mV", value = "")
+  }
+  reset_temp <- function(){
+    updateTextInput(session, "temp_reference_desc", label = "Temp Reference Type", value = "Lab thermometer")
+    updateNumericInput(session, "temp_reference", label = "Reference Temp", value = "")
+    updateNumericInput(session, "temp_observed", label = "Sensor Temp", value = "")
+  }
+  reset_orp <- function(){
+    updateNumericInput(session, "orp_std", label = "ORP Standard solution mV", value = "")
+    updateNumericInput(session, "orp_pre_mV", label = "ORP mV Pre-Cal Value", value = "")
+    updateNumericInput(session, "orp_post_mV", label = "ORP mV Post-Cal Value", value = "")
+  }
+  reset_spc <- function(){
+    updateNumericInput(session, "SpC1_std", label = "SpC Low-Range Standard", value = "0")
+    updateNumericInput(session, "SpC1_pre", label = "SpC Low-Range Pre-Cal Value", value = "")
+    updateNumericInput(session, "SpC1_post", label = "SpC Low-Range Post-Cal Value", value = "")
+    updateNumericInput(session, "SpC2_std", label = "SpC High-Range Standard", value = "1413")
+    updateNumericInput(session, "SpC2_pre", label = "SpC High-Range Pre-Cal Value", value = "")
+    updateNumericInput(session, "SpC2_post", label = "SpC High-Range Post-Cal Value", value = "")
+  }
+  reset_turb <- function(){
+    updateNumericInput(session, "turb1_std", label = "Low Turb Standard Value", value = "0")
+    updateNumericInput(session, "turb2_std", label = "High Turb Standard Value", value = "124")
+    updateNumericInput(session, "turb1_pre", label = "Low Turb Pre-cal Value", value = "")
+    updateNumericInput(session, "turb2_pre", label = "High Turb Pre-cal Value", value = "")
+    updateNumericInput(session, "turb1_post", label = "Low Turb Post-cal Value", value = "")
+    updateNumericInput(session, "turb2_post", label = "High Turb Post-cal Value", value = "")
+  }
+  reset_do <- function(){
+    updateNumericInput(session, "baro_press_pre", label = "Baro Pressure Pre-Cal", value = "")
+    updateNumericInput(session, "baro_press_post", label = "Baro Pressure Post-Cal", value = "")
+    updateNumericInput(session, "DO_pre", label = "DO Pre-Cal mg/L", value = "")
+    updateNumericInput(session, "DO_post", label = "DO Post-Cal mg/L", value = "")
+  }
+  reset_depth <- function(){
+    updateRadioButtons(session, inputId = "depth_check_ok", selected = "FALSE")
+    updateRadioButtons(session, inputId = "depth_changes_ok", selected = "FALSE")
+  }
+
+  #Authenticate and fetch from Google
   googlesheets4::gs4_auth(cache = ".secrets", email = TRUE, use_oob = TRUE) #Run after the above two lines are run once.
   googledrive::drive_auth(cache = ".secrets", email = TRUE, use_oob = TRUE) #Run after the above two lines are run once.
   calibrations_id <- googledrive::drive_get("calibrations/calibrations")$id
@@ -153,10 +210,15 @@ app_server <- function(input, output, session) {
     }
   })
   observeEvent(input$save_cal_instrument, { #save the new record or the changes to existing record
-    new_id <- max(as.numeric(instruments_data$sheet$instrument_ID) + 1)
-    if (input$existing_serial_no == "New record"){ #add a new row with the next instrument_ID
-      #first check to make sure the serial no does not already exist
+    if (nrow(instruments_data$sheet) == 0){
+      new_id <- 1
+      check <- FALSE
+    } else {
+      new_id <- max(as.numeric(instruments_data$sheet$instrument_ID) + 1)
+      #check to make sure the serial no does not already exist
       check <- input$serial_no %in% instruments_data$sheet$serial_no
+    }
+    if (input$existing_serial_no == "New record"){ #add a new row with the next instrument_ID
       if (check) {
         shinyalert::shinyalert("Serial number already exists!", text = "You selected 'New record' and then entered an existing serial number.", type = "error")
       } else { #Make a new entry
@@ -168,11 +230,12 @@ app_server <- function(input, output, session) {
                                     type = input$type,
                                     serial_no = input$serial_no,
                                     asset_tag = input$asset_tag,
-                                    date_in_service = input$date_in_service,
-                                    date_purchased = input$date_purchased,
+                                    date_in_service = if (length(input$date_in_service) == 0) NA else as.character(input$date_in_service),
+                                    date_purchased = if (length(input$date_purchased) == 0) NA else as.character(input$date_purchased),
                                     retired_by = input$retired_by,
-                                    date_retired = input$date_retired)
+                                    date_retired = if (length(input$date_retired) == 0) NA else as.character(input$date_retired))
         googlesheets4::sheet_append(instruments_id, sheet = "instruments", data = instrument.df)
+        shinyalert::shinyalert(paste0("Serial number ", input$serial_no, " added"), type = "success", timer = 2000)
       }
     } else { #Modify an existing entry
       #find the row number for the existing observation
@@ -186,16 +249,19 @@ app_server <- function(input, output, session) {
                                   type = input$type,
                                   serial_no = input$serial_no,
                                   asset_tag = input$asset_tag,
-                                  date_in_service = input$date_in_service,
-                                  date_purchased = input$date_purchased,
+                                  date_in_service = if (length(input$date_in_service) == 0) NA else as.character(input$date_in_service),
+                                  date_purchased = if (length(input$date_purchased) == 0) NA else as.character(input$date_purchased),
                                   retired_by = input$retired_by,
-                                  date_retired = input$date_retired)
+                                  date_retired = if (length(input$date_retired) == 0) NA else as.character(input$date_retired))
       googlesheets4::range_write(instruments_id, sheet = "instruments", data = instrument.df, range = paste0(row, ":", row) , col_names = FALSE)
+      shinyalert::shinyalert(paste0("Serial number ", input$serial_no, " modified"), type = "success", timer = 2000)
     }
+    #Reload the instruments sheet to reflect modifications
     instruments_sheet <- googlesheets4::read_sheet(instruments_id, sheet = "instruments")
-    instruments_data$sheet <- instruments_sheet #assign to a reactive
+    instruments_data$sheet <- instruments_sheet #assign to a reactive again
     instruments_data$handhelds <- instruments_sheet[instruments_sheet$type == "Handheld (connects to bulkheads)" & is.na(instruments_sheet$date_retired) , ]
     instruments_data$others <- instruments_sheet[instruments_sheet$type != "Handheld (connects to bulkheads)" & is.na(instruments_sheet$date_retired) , ]
+    updateSelectInput(session, "existing_serial_no", choices = c("New record", instruments_data$sheet$serial_no))
   })
 
   observeEvent(input$restart_calibration, {
@@ -208,6 +274,7 @@ app_server <- function(input, output, session) {
       shinyalert::shinyalert("Loading old calibration", text = "Please wait to be taken to the calibration section", type = "info", timer = 5000)
       incomplete_ID <- as.numeric(incomplete_observations[restart_value , 1])
       calibration_data$next_id <- incomplete_ID
+      calibration_data$restarted_id <- incomplete_ID
       # Reset the basic fields according to recovered info
       updateTextInput(session, "observer", value = incomplete_observations[restart_value , "observer"]$observer)
       updateDateInput(session, "obs_date", value = as.Date(incomplete_observations[restart_value , "obs_date"]$obs_date))
@@ -340,6 +407,17 @@ app_server <- function(input, output, session) {
       complete$turbidity <- FALSE
       complete$DO <- FALSE
       complete$depth <- FALSE
+      # reset fields previously loaded if loaded calibration is the one being deleted
+      if (delete_ID == calibration_data$restarted_id){
+        reset_basic()
+        reset_ph()
+        reset_temp()
+        reset_orp()
+        reset_spc()
+        reset_turb()
+        reset_do()
+        reset_depth()
+      }
       shinyalert::shinyalert("Deleted", type = "success", immediate = TRUE, timer = 2000)
     }
   })
@@ -666,7 +744,7 @@ app_server <- function(input, output, session) {
         if (!("Basic info" %in% send_table$saved)){
           calibration_data$basic <- data.frame(observation_ID = calibration_data$next_id,
                                                observer = "NOT SET",
-                                               obs_date = as.character(Sys.Date()),
+                                               obs_date = Sys.Date(),
                                                obs_time = Sys.time(),
                                                ID_sensor_holder = "NOT SET",
                                                ID_handheld_meter = "NOT SET",
@@ -699,21 +777,7 @@ app_server <- function(input, output, session) {
     row <- which(pH_sheet$observation_ID == calibration_data$next_id)+1
     googlesheets4::range_clear(calibrations_id, sheet = "pH", range = paste0(row, ":", row))
     #reset the fields
-    updateNumericInput(session, "pH1_std", label = "Low pH solution value", value = "4")
-    updateNumericInput(session, "pH2_std", label = "Neutral pH solution value", value = "7")
-    updateNumericInput(session, "pH3_std", label = "High pH solution value", value = "10")
-    updateNumericInput(session, "pH1_pre_val", label = "pH 4 Pre-Cal Value", value = "")
-    updateNumericInput(session, "pH1_pre_mV", label = "pH 4 Pre-Cal mV", value = "")
-    updateNumericInput(session, "pH2_pre_val", label = "pH 7 Pre-Cal Value", value = "")
-    updateNumericInput(session, "pH2_pre_mV", label = "pH 7 Pre-Cal mV", value = "")
-    updateNumericInput(session, "pH3_pre_val", label = "pH 10 Pre-Cal Value", value = "")
-    updateNumericInput(session, "pH3_pre_mV", label = "pH 10 Pre-Cal mV", value = "")
-    updateNumericInput(session, "pH1_post_val", label = "pH 4 Post-Cal Value", value = "")
-    updateNumericInput(session, "pH1_post_mV", label = "pH 4 Post-Cal mV", value = "")
-    updateNumericInput(session, "pH2_post_val", label = "pH 7 Post-Cal Value", value = "")
-    updateNumericInput(session, "pH2_post_mV", label = "pH 7 Post-Cal mV", value = "")
-    updateNumericInput(session, "pH3_post_val", label = "pH 10 Post-Cal Value", value = "")
-    updateNumericInput(session, "pH3_post_mV", label = "pH 10 Post-Cal mV", value = "")
+    reset_ph()
     #remove from display tables
     send_table$saved <- send_table$saved[send_table$saved[1] != "pH calibration" , , drop=FALSE]
     send_table$restarted_cal <- send_table$restarted_cal[send_table$restarted_cal[1] != "pH calibration" , , drop=FALSE]
@@ -732,6 +796,7 @@ app_server <- function(input, output, session) {
       send_table$restarted_cal
     })
     complete$pH <- FALSE
+    shinyjs::hide("delete_pH")
   })
 
   ### Save/Delete temperature
@@ -755,7 +820,7 @@ app_server <- function(input, output, session) {
         if (!("Basic info" %in% send_table$saved)){
           calibration_data$basic <- data.frame(observation_ID = calibration_data$next_id,
                                                observer = "NOT SET",
-                                               obs_date = as.character(Sys.Date()),
+                                               obs_date = Sys.Date(),
                                                obs_time = Sys.time(),
                                                ID_sensor_holder = "NOT SET",
                                                ID_handheld_meter = "NOT SET",
@@ -787,9 +852,7 @@ app_server <- function(input, output, session) {
     row <- which(temp_sheet$observation_ID == calibration_data$next_id)+1
     googlesheets4::range_clear(calibrations_id, sheet = "temperature", range = paste0(row, ":", row))
     #reset the fields
-    updateTextInput(session, "temp_reference_desc", label = "Temp Reference Type", value = "Lab thermometer")
-    updateNumericInput(session, "temp_reference", label = "Reference Temp", value = "")
-    updateNumericInput(session, "temp_observed", label = "Sensor Temp", value = "")
+    reset_temp()
     #remove from display tables
     send_table$saved <- send_table$saved[send_table$saved[1] != "Temperature calibration" , , drop=FALSE] #drop = FALSE is necessary to return a table and not a vector, which is default if returning only one col
     send_table$restarted_cal <- send_table$restarted_cal[send_table$restarted_cal[1] != "Temperature calibration" , , drop=FALSE]
@@ -808,6 +871,7 @@ app_server <- function(input, output, session) {
       send_table$restarted_cal
     })
     complete$temperature <- FALSE
+    shinyjs::hide("delete_temp")
   })
 
   ### Save/Delete ORP
@@ -831,7 +895,7 @@ app_server <- function(input, output, session) {
         if (!("Basic info" %in% send_table$saved)){
           calibration_data$basic <- data.frame(observation_ID = calibration_data$next_id,
                                                observer = "NOT SET",
-                                               obs_date = as.character(Sys.Date()),
+                                               obs_date = Sys.Date(),
                                                obs_time = Sys.time(),
                                                ID_sensor_holder = "NOT SET",
                                                ID_handheld_meter = "NOT SET",
@@ -863,9 +927,7 @@ app_server <- function(input, output, session) {
     row <- which(orp_sheet$observation_ID == calibration_data$next_id)+1
     googlesheets4::range_clear(calibrations_id, sheet = "ORP", range = paste0(row, ":", row))
     #reset the fields
-    updateNumericInput(session, "orp_std", label = "ORP Standard solution mV", value = "")
-    updateNumericInput(session, "orp_pre_mV", label = "ORP mV Pre-Cal Value", value = "")
-    updateNumericInput(session, "orp_post_mV", label = "ORP mV Post-Cal Value", value = "")
+    reset_orp()
     #remove from display tables
     send_table$saved <- send_table$saved[send_table$saved[1] != "ORP calibration" , , drop=FALSE]
     send_table$restarted_cal <- send_table$restarted_cal[send_table$restarted_cal[1] != "ORP calibration" , , drop=FALSE]
@@ -884,6 +946,7 @@ app_server <- function(input, output, session) {
       send_table$restarted_cal
     })
     complete$orp <- FALSE
+    shinyjs::hide("delete_orp")
   })
 
   ### Save/Delete SpC
@@ -910,7 +973,7 @@ app_server <- function(input, output, session) {
         if (!("Basic info" %in% send_table$saved)){
           calibration_data$basic <- data.frame(observation_ID = calibration_data$next_id,
                                                observer = "NOT SET",
-                                               obs_date = as.character(Sys.Date()),
+                                               obs_date = Sys.Date(),
                                                obs_time = Sys.time(),
                                                ID_sensor_holder = "NOT SET",
                                                ID_handheld_meter = "NOT SET",
@@ -942,12 +1005,7 @@ app_server <- function(input, output, session) {
     row <- which(spc_sheet$observation_ID == calibration_data$next_id)+1
     googlesheets4::range_clear(calibrations_id, sheet = "SpC", range = paste0(row, ":", row))
     #reset the fields
-    updateNumericInput(session, "SpC1_std", label = "SpC Low-Range Standard", value = "0")
-    updateNumericInput(session, "SpC1_pre", label = "SpC Low-Range Pre-Cal Value", value = "")
-    updateNumericInput(session, "SpC1_post", label = "SpC Low-Range Post-Cal Value", value = "")
-    updateNumericInput(session, "SpC2_std", label = "SpC High-Range Standard", value = "1413")
-    updateNumericInput(session, "SpC2_pre", label = "SpC High-Range Pre-Cal Value", value = "")
-    updateNumericInput(session, "SpC2_post", label = "SpC High-Range Post-Cal Value", value = "")
+    reset_spc()
     #remove from display tables
     send_table$saved <- send_table$saved[send_table$saved[1] != "Conductivity calibration", , drop=FALSE]
     send_table$restarted_cal <- send_table$restarted_cal[send_table$restarted_cal[1] != "Conductivity calibration" , , drop = FALSE]
@@ -966,6 +1024,7 @@ app_server <- function(input, output, session) {
       send_table$restarted_cal
     })
     complete$SpC <- FALSE
+    shinyjs::hide("delete_SpC")
   })
 
   ### Save/Delete turbidity
@@ -992,7 +1051,7 @@ app_server <- function(input, output, session) {
         if (!("Basic info" %in% send_table$saved)){
           calibration_data$basic <- data.frame(observation_ID = calibration_data$next_id,
                                                observer = "NOT SET",
-                                               obs_date = as.character(Sys.Date()),
+                                               obs_date = Sys.Date(),
                                                obs_time = Sys.time(),
                                                ID_sensor_holder = "NOT SET",
                                                ID_handheld_meter = "NOT SET",
@@ -1024,12 +1083,7 @@ app_server <- function(input, output, session) {
     row <- which(turb_sheet$observation_ID == calibration_data$next_id)+1
     googlesheets4::range_clear(calibrations_id, sheet = "turbidity", range = paste0(row, ":", row))
     #reset the fields
-    updateNumericInput(session, "turb1_std", label = "Low Turb Standard Value", value = "0")
-    updateNumericInput(session, "turb2_std", label = "High Turb Standard Value", value = "124")
-    updateNumericInput(session, "turb1_pre", label = "Low Turb Pre-cal Value", value = "")
-    updateNumericInput(session, "turb2_pre", label = "High Turb Pre-cal Value", value = "")
-    updateNumericInput(session, "turb1_post", label = "Low Turb Post-cal Value", value = "")
-    updateNumericInput(session, "turb2_post", label = "High Turb Post-cal Value", value = "")
+    reset_turb()
     #remove from display tables
     send_table$saved <- send_table$saved[send_table$saved[1] != "Turbidity calibration" , , drop=FALSE]
     send_table$restarted_cal <- send_table$restarted_cal[send_table$restarted_cal[1] != "Turbidity calibration" , , drop=FALSE]
@@ -1048,6 +1102,7 @@ app_server <- function(input, output, session) {
       send_table$restarted_cal
     })
     complete$turbidity <- FALSE
+    shinyjs::hide("delete_turb")
   })
 
   ### Save/Delete DO
@@ -1072,7 +1127,7 @@ app_server <- function(input, output, session) {
         if (!("Basic info" %in% send_table$saved)){
           calibration_data$basic <- data.frame(observation_ID = calibration_data$next_id,
                                                observer = "NOT SET",
-                                               obs_date = as.character(Sys.Date()),
+                                               obs_date = Sys.Date(),
                                                obs_time = Sys.time(),
                                                ID_sensor_holder = "NOT SET",
                                                ID_handheld_meter = "NOT SET",
@@ -1104,10 +1159,7 @@ app_server <- function(input, output, session) {
     row <- which(DO_sheet$observation_ID == calibration_data$next_id)+1
     googlesheets4::range_clear(calibrations_id, sheet = "DO", range = paste0(row, ":", row))
     #reset the fields
-    updateNumericInput(session, "baro_press_pre", label = "Baro Pressure Pre-Cal", value = "")
-    updateNumericInput(session, "baro_press_post", label = "Baro Pressure Post-Cal", value = "")
-    updateNumericInput(session, "DO_pre", label = "DO Pre-Cal mg/L", value = "")
-    updateNumericInput(session, "DO_post", label = "DO Post-Cal mg/L", value = "")
+    reset_do()
     #remove from display tables
     send_table$saved <- send_table$saved[send_table$saved[1] != "DO calibration" , , drop=FALSE]
     send_table$restarted_cal <- send_table$restarted_cal[send_table$restarted_cal[1] != "DO calibration" , , drop=FALSE]
@@ -1126,6 +1178,7 @@ app_server <- function(input, output, session) {
       send_table$restarted_cal
     })
     complete$DO <- FALSE
+    shinyjs::hide("delete_DO")
   })
 
   ### Save/Delete depth
@@ -1148,7 +1201,7 @@ app_server <- function(input, output, session) {
         if (!("Basic info" %in% send_table$saved)){
           calibration_data$basic <- data.frame(observation_ID = calibration_data$next_id,
                                                observer = "NOT SET",
-                                               obs_date = as.character(Sys.Date()),
+                                               obs_date = Sys.Date(),
                                                obs_time = Sys.time(),
                                                ID_sensor_holder = "NOT SET",
                                                ID_handheld_meter = "NOT SET",
@@ -1180,8 +1233,7 @@ app_server <- function(input, output, session) {
     row <- which(depth_sheet$observation_ID == calibration_data$next_id)+1
     googlesheets4::range_clear(calibrations_id, sheet = "depth", range = paste0(row, ":", row))
     #reset the fields
-    updateRadioButtons(session, inputId = "depth_check_ok", selected = "FALSE")
-    updateRadioButtons(session, inputId = "depth_changes_ok", selected = "FALSE")
+    reset_depth()
     #remove from display tables
     send_table$saved <- send_table$saved[send_table$saved[1] != "Depth calibration" , , drop=FALSE]
     send_table$restarted_cal <- send_table$restarted_cal[send_table$restarted_cal[1] != "Depth calibration" , , drop=FALSE]
@@ -1200,6 +1252,7 @@ app_server <- function(input, output, session) {
       send_table$restarted_cal
     })
     complete$depth <- FALSE
+    shinyjs::hide("delete_depth")
   })
 
 
@@ -1210,18 +1263,27 @@ app_server <- function(input, output, session) {
     } else if (!("Temperature calibration" %in% send_table$saved[ ,1] | "Temperature calibration" %in% send_table$restarted_cal[ ,1])){
       shinyalert::shinyalert(title = "Temperature calibration is mandatory", text = "If you've filled it in already you probably forgot to save it!", type = "error")
     } else {
-      shinyalert::shinyalert(title = paste0("Finalizing..."), type = "info")
-      # Send the calibrations and mark it as complete == TRUE after everything is sent
-      cals_saved <- paste(send_table$saved[, 1], collapse = " ")
-      cals_saved <- gsub(" calibration", "", cals_saved)
-      cals_saved <- gsub(" ", ", ", cals_saved)
-      #read in observations again as the sheet now has a new row or a row that is being edited from incomplete calibration.
-      observations <- googlesheets4::read_sheet(calibrations_id, sheet = "observations")
-      googlesheets4::range_write(calibrations_id, data = data.frame(complete = TRUE), sheet = "observations", range = paste0("G", which(observations$observation_ID == calibration_data$next_id)+1), col_names = FALSE)
-      shinyalert::shinyalert(title = paste0("Calibration marked as complete."),
-                 type = "success", immediate = TRUE)
-      Sys.sleep(3)
-      stopApp()
+      shinyalert::shinyalert("Are you sure?", "Finalized calibrations cannot be edited.", showCancelButton = TRUE,
+                             callbackR = function(x) {
+                               if (x) {# Mark it as complete == TRUE. Read in observations again as the sheet now has a new row or a row that is being edited from incomplete calibration.
+                                 observations <- googlesheets4::read_sheet(calibrations_id, sheet = "observations")
+                                 googlesheets4::range_write(calibrations_id, data = data.frame(complete = TRUE), sheet = "observations", range = paste0("G", which(observations$observation_ID == calibration_data$next_id)+1), col_names = FALSE)
+                                 shinyalert::shinyalert(title = paste0("Calibration finalized."),
+                                                        type = "success", immediate = TRUE)
+                                 #Reset fields
+                                 reset_basic()
+                                 reset_ph()
+                                 reset_temp()
+                                 reset_orp()
+                                 reset_spc()
+                                 reset_turb()
+                                 reset_do()
+                                 reset_depth()
+                                 #Get the next ID in case user is calibrating/working in app again
+                                 calibration_data$next_id <- max(observations$observation_ID) + 1
+                               }
+                             } #end of callbackR
+      )
     }
   })
 }

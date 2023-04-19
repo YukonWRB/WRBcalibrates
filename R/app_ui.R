@@ -48,7 +48,7 @@ app_ui <- function(request) {
             textInput("recorder", label = "Observer name", value = ""),
             selectInput("make", label = "Instrument make", choices = c("", "YSI", "Solinst", "HOBO/Onset", "OTT", "RBR", "Campbell Sci", "In-Situ", "Other"), ),
             textInput("model", label = "Instrument model", value = ""),
-            selectInput("type", label = "Instrument type", choices = c("", "Logger (single-param deployable)", "Sonde (multi-param deployable)", "Bulkhead (requires handheld, not deployable)", "Handheld (connects to bulkhead)", "Sensor (single/multi-param not deployable i.e. thermometer or combo meter")), #beware if changing names that 'Handheld (connects to bulkhead)' is employed in app_server
+            selectInput("type", label = "Instrument type", choices = c("", "Logger (single/multi-param deployable, fixed sensors)", "Sonde (multi-param deployable, interchangeable sensors)", "Bulkhead (requires handheld, not deployable)", "Handheld (connects to bulkhead)", "Sensor (single/multi-param not deployable i.e. thermometer or combo meter")), #beware if changing names that 'Handheld (connects to bulkhead)' is employed in app_server
             textInput("asset_tag", "Asset tag number", value = ""),
             dateInput("date_in_service", label = "Date in service"),
             dateInput("date_purchased", label = "Date purchased"),
@@ -68,8 +68,8 @@ app_ui <- function(request) {
                         label = "Select a parameter",
                         choices = c("Basic calibration info", "Temperature calibration", "Conductivity calibration", "pH calibration", "ORP calibration", "Turbidity calibration", "DO calibration", "Depth calibration")),
             conditionalPanel(
-              textInput("observer", label = "Calibrator name", value = ""),
               condition = "input.selection == 'Basic calibration info'",
+              textInput("observer", label = "Calibrator name", value = ""),
               dateInput("obs_date", label = "Calibration date"),
               shinyTime::timeInput("obs_time", label = "Calibration time MST", value = .POSIXct(Sys.time(), tz = "MST"), seconds = FALSE, minute.steps = 30),
               textOutput("instrument_reminder"),

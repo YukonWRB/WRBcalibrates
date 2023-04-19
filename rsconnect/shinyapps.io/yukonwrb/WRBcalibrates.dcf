@@ -5,10 +5,10 @@ account: yukonwrb
 server: shinyapps.io
 hostUrl: https://api.shinyapps.io/v1
 appId: 8847835
-bundleId: 7110459
+bundleId: 7111022
 url: https://yukonwrb.shinyapps.io/WRBcalibrates/
-when: 1681926250.00267
-lastSyncTime: 1681926250.00268
+when: 1681936041.20893
+lastSyncTime: 1681936041.20894
 asMultiple: FALSE
 asStatic: FALSE
-ignoredFiles: CODE_OF_CONDUCT.md|dev/01_start.R|dev/02_dev.R|dev/03_deploy.R|dev/run_dev.R|NEWS.md|README.md|README.Rmd
+ignoredFiles: dev/01_start.R|dev/02_dev.R|dev/03_deploy.R|dev/run_dev.R|README.md|README.Rmd
