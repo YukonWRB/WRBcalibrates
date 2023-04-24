@@ -70,7 +70,9 @@ app_ui <- function(request) {
             actionButton("sensor6_show", "Sensor 6"),
             actionButton("sensor7_show", "Sensor 7"),
             actionButton("sensor8_show", "Sensor 8"),
-            selectInput("add_sensor_dropdown", "Add a sensor", choices = c("", "pH", "pH/ORP", "ORP", "Conductivity/Temperature", "Conductivity", "Turbidity", "Temperature", "DO", "Depth", "Nitrate", "Ammonium", "Chloride" , "DOM", "Rhodamine", "Total algae")),
+            selectizeInput("add_sensor_dropdown", "Add a sensor", choices = c("", "pH", "pH/ORP", "ORP", "Conductivity/Temperature", "Conductivity", "Turbidity", "Temperature", "DO", "Depth", "Nitrate", "Ammonium", "Chloride" , "DOM", "Rhodamine", "Total algae")),
+            textInput("new_sensor_serial", "Serial number", ""),
+            textOutput("add_sensor_note"),
             textInput("add_sensor_name", "What's your name?", value = ""),
             actionButton("add_sensor", "Submit")
           ),
@@ -228,9 +230,10 @@ app_ui <- function(request) {
             tableOutput("sensor7_details"),
             tableOutput("sensor8_details"),
             selectInput("change_sensor", "Assign a new sensor", choices = c("pH", "pH/ORP", "ORP", "Conductivity", "Turbidity", "Temperature", "DO", "Depth", "Nitrate", "Ammonium", "Chloride" , "DOM", "Rhodamine", "Total algae")),
+            textInput("add_sensor_serial", "Serial number", ""),
             textAreaInput("add_comment", "Add a note", "", height = "100px"),
             textInput("add.change_sensor.comment_name", "What's your name?"),
-            actionButton("add.change_sensor.comment", "Submit")
+            actionButton("add.change_sensor.comment", "Submit new record")
           )
         )
       )
