@@ -32,7 +32,7 @@ db_create <- function(path, overwrite = FALSE) {
                  "CREATE TABLE instruments (
           obs_datetime TEXT NOT NULL,
           observer TEXT NOT NULL,
-          ID INTEGER PRIMARY KEY AUTOINCREMENT,
+          instrument_ID INTEGER PRIMARY KEY AUTOINCREMENT,
           make TEXT NOT NULL,
           model TEXT NOT NULL,
           type TEXT NOT NULL,
@@ -43,22 +43,31 @@ db_create <- function(path, overwrite = FALSE) {
           date_purchased TEXT,
           date_retired TEXT)")
 
-  # # Create "sensor_arrays" table
-  # DBI::dbExecute(con,
-  #                "CREATE TABLE sensor_arrays (
-  #         ID INTEGER NOT NULL,
-  #         obs_datetime TEXT NOT NULL,
-  #         sensor1 TEXT NOT NULL,
-  #         sensor2 TEXT,
-  #         sensor3 TEXT,
-  #         sensor4 TEXT,
-  #         sensor5 TEXT,
-  #         sensor6 TEXT,
-  #         sensor7 TEXT,
-  #         sensor8 TEXT,
-  #         PRIMARY KEY (ID, obs_datetime)
-  #         FOREIGN KEY (ID) REFERENCES instruments(ID))
-  #         WITHOUT ROWID")
+  # Create "sensor_arrays" table
+  DBI::dbExecute(con,
+                 "CREATE TABLE sensor_arrays (
+          instrument_ID INTEGER NOT NULL,
+          observer TEXT NOT NULL,
+          obs_datetime TEXT NOT NULL,
+          sensor1_type TEXT,
+          sensor2_type TEXT,
+          sensor3_type TEXT,
+          sensor4_type TEXT,
+          sensor5_type TEXT,
+          sensor6_type TEXT,
+          sensor7_type TEXT,
+          sensor8_type TEXT,
+          sensor1_notes TEXT,
+          sensor2_notes TEXT,
+          sensor3_notes TEXT,
+          sensor4_notes TEXT,
+          sensor5_notes TEXT,
+          sensor6_notes TEXT,
+          sensor7_notes TEXT,
+          sensor8_notes TEXT,
+          PRIMARY KEY (ID, obs_datetime)
+          FOREIGN KEY (ID) REFERENCES instruments(ID))
+          WITHOUT ROWID")
 
   # Create "calibrations" table
   DBI::dbExecute(con,

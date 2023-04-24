@@ -37,7 +37,7 @@ app_ui <- function(request) {
       # Title
       titlePanel("Instrument Calibration and Tracking"),
       # Broad category selection
-      selectInput("first_selection", label = "Choose a task", choices = c("Calibrate", "Manage instruments", "View unfinished calibrations")),
+      selectInput("first_selection", label = "Choose a task", choices = c("Calibrate", "Manage instruments", "Manage sensors and log maintenance", "View unfinished calibrations")),
       # Input form
       sidebarLayout(
         sidebarPanel(
@@ -55,6 +55,24 @@ app_ui <- function(request) {
             dateInput("date_retired", label = "Date retired"),
             textInput("retired_by", label = "Retired by", value = ""),
             actionButton("save_cal_instrument", "Save this sheet")
+          ),
+          conditionalPanel(
+            # On initial load, this page will only show the selectInput box. Once an instrument is selected, instrument details will be listed in the mainPanel and sensors will appear in the sidePanel. Each sensor will appear as an actionButton, and clicking that actionButton will load its details in the mainPanel. Once that happens, the sidebarPanel will change to show actionButtons to "Change" or "Maintain" the sensor.
+            condition = "input.first_selection == 'Manage sensors and log maintenance'",
+            textOutput("sensors_reminder"),
+            selectInput("maintain_serial", "Select your instrument", choices = "loading choices..."), #updated by the server
+            actionButton("load_sensors", "Load data"), #triggers shinyjs::show for the sensors, depending on how many are on the device
+            actionButton("sensor1_show", "Sensor 1"), #updated by the server, hidden until load_sensors is clicked. Value will go on another line using HTML("line 1<br>line2)
+            actionButton("sensor2_show", "Sensor 2"),
+            actionButton("sensor3_show", "Sensor 3"),
+            actionButton("sensor4_show", "Sensor 4"),
+            actionButton("sensor5_show", "Sensor 5"),
+            actionButton("sensor6_show", "Sensor 6"),
+            actionButton("sensor7_show", "Sensor 7"),
+            actionButton("sensor8_show", "Sensor 8"),
+            selectInput("add_sensor_dropdown", "Add a sensor", choices = c("", "pH", "pH/ORP", "ORP", "Conductivity/Temperature", "Conductivity", "Turbidity", "Temperature", "DO", "Depth", "Nitrate", "Ammonium", "Chloride" , "DOM", "Rhodamine", "Total algae")),
+            textInput("add_sensor_name", "What's your name?", value = ""),
+            actionButton("add_sensor", "Submit")
           ),
           conditionalPanel(
             condition = "input.first_selection == 'View unfinished calibrations'",
@@ -181,7 +199,7 @@ app_ui <- function(request) {
             )
           ),
           actionButton("submit_btn", "Finalize Calibration")
-        ),
+        ), #end of sidebarPanel
 
         # Output tables
         mainPanel(
@@ -197,6 +215,22 @@ app_ui <- function(request) {
           conditionalPanel(
             condition = "input.first_selection == 'Manage instruments'",
             textOutput("manage_text")
+          ),
+          conditionalPanel(
+            condition = "input.first_selection == 'Manage sensors and log maintenance'",
+            tableOutput("instrument_details"), #This table will show up first to allow the user to select the right instrument
+            tableOutput("sensor1_details"), # this and subsequent sensors are hidden until the user selects to view
+            tableOutput("sensor2_details"),
+            tableOutput("sensor3_details"),
+            tableOutput("sensor4_details"),
+            tableOutput("sensor5_details"),
+            tableOutput("sensor6_details"),
+            tableOutput("sensor7_details"),
+            tableOutput("sensor8_details"),
+            selectInput("change_sensor", "Assign a new sensor", choices = c("pH", "pH/ORP", "ORP", "Conductivity", "Turbidity", "Temperature", "DO", "Depth", "Nitrate", "Ammonium", "Chloride" , "DOM", "Rhodamine", "Total algae")),
+            textAreaInput("add_comment", "Add a note", "", height = "100px"),
+            textInput("add.change_sensor.comment_name", "What's your name?"),
+            actionButton("add.change_sensor.comment", "Submit")
           )
         )
       )

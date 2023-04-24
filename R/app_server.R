@@ -15,6 +15,8 @@ app_server <- function(input, output, session) {
   restarted <- reactiveValues()
   restarted$restarted <- FALSE
   instruments_data <- reactiveValues()
+  sensors_data <- reactiveValues()
+  sensors_data$datetime <- as.character(.POSIXct(Sys.time(), tz = "MST")) #get the time here so that multiple maintenance events are on same line
   send_table <- reactiveValues()
   messages <- reactiveValues()
   complete <- reactiveValues()
@@ -28,6 +30,7 @@ app_server <- function(input, output, session) {
   complete$depth <- FALSE
 
   # Hide a bunch of buttons until they can be used
+  # Delete buttons to remove a calibration sheet
   shinyjs::hide("delete_pH")
   shinyjs::hide("delete_turb")
   shinyjs::hide("delete_SpC")
@@ -35,21 +38,54 @@ app_server <- function(input, output, session) {
   shinyjs::hide("delete_orp")
   shinyjs::hide("delete_DO")
   shinyjs::hide("delete_depth")
-
+  # Buttons to show sensor information
+  shinyjs::hide("sensor1_show")
+  shinyjs::hide("sensor2_show")
+  shinyjs::hide("sensor3_show")
+  shinyjs::hide("sensor4_show")
+  shinyjs::hide("sensor5_show")
+  shinyjs::hide("sensor6_show")
+  shinyjs::hide("sensor7_show")
+  shinyjs::hide("sensor8_show")
+  shinyjs::hide("add_sensor")
+  shinyjs::hide("add_sensor_dropdown")
+  shinyjs::hide("add_sensor_name")
+  shinyjs::hide("load_sensors")
+  shinyjs::hide("sensor1_details")
+  shinyjs::hide("sensor2_details")
+  shinyjs::hide("sensor3_details")
+  shinyjs::hide("sensor4_details")
+  shinyjs::hide("sensor5_details")
+  shinyjs::hide("sensor6_details")
+  shinyjs::hide("sensor7_details")
+  shinyjs::hide("sensor8_details")
+  shinyjs::hide("change_sensor")
+  shinyjs::hide("add_comment")
+  shinyjs::hide("add.change_sensor.comment_name")
+  shinyjs::hide("add.change_sensor.comment")
 
   #message for the instrument management table
   messages$manage_instruments <- "You can add a new instrument or edit an existing entry. If adding a new instrument you must select 'New record' under 'Search existing serial numbers'. Only serial number and instrument type are mandatory, but please be as thorough as possible."
   messages$instrument_reminder <- "Add your instrument if not listed!"
 
-  # Initiate data.frame to populate with save calibrations later
+  # Initiate data.frame to populate with saved calibrations later
   send_table$saved <- data.frame("Saved calibrations" = "Nothing saved yet", check.names = FALSE) #Title is modified later for clarity if user want to restart a cal
   send_table$restarted_cal <- data.frame("Saved calibrations (recovered session)" = "Basic info", check.names = FALSE)
+  # Initiate data.frame for instrument details when maintaining
+  sensors_data$instrument_table <- data.frame("Select an instrument first" = NA, check.names = FALSE)
+  sensors_data$sensor1_details <- data.frame("Nothing to show yet!" = NA, check.names = FALSE)
+  output$sensor1_details <- renderTable({
+    sensors_data$sensor1_details
+  })
 
   #output the messages
   output$manage_text <- renderText({
     messages$manage_instruments
   })
   output$instrument_reminder <- renderText({
+    messages$instrument_reminder
+  })
+  output$sensors_reminder <- renderText({
     messages$instrument_reminder
   })
 
@@ -120,10 +156,12 @@ app_server <- function(input, output, session) {
   googledrive::drive_auth(cache = ".secrets", email = TRUE, use_oob = TRUE) #Run after the above two lines are run once.
   calibrations_id <- googledrive::drive_get("calibrations/calibrations")$id
   instruments_id <- googledrive::drive_get("calibrations/instruments")$id
+  sensors_id <- googledrive::drive_get("calibrations/sensors")$id
   instruments_sheet <- googlesheets4::read_sheet(instruments_id, sheet = "instruments")
   instruments_data$sheet <- instruments_sheet #assign to a reactive
   instruments_data$handhelds <- instruments_sheet[instruments_sheet$type == "Handheld (connects to bulkheads)" & is.na(instruments_sheet$date_retired) , ]
   instruments_data$others <- instruments_sheet[instruments_sheet$type != "Handheld (connects to bulkheads)" & is.na(instruments_sheet$date_retired) , ]
+  instruments_data$maintainable <- instruments_sheet[instruments_sheet$type %in% c("Sonde (multi-param deployable, interchangeable sensors)", "Bulkhead (requires handheld, not deployable)", "Logger (single/multi-param deployable, fixed sensors)") , ]
 
   # query the observations sheet for increment number and unfinished calibrations
   observations <- googlesheets4::read_sheet(calibrations_id, sheet = "observations")
@@ -174,6 +212,13 @@ app_server <- function(input, output, session) {
       shinyjs::hide("submit_btn")
       updateSelectInput(session, "existing_serial_no", choices = c("New record", instruments_data$sheet$serial_no))
       updateDateInput(session, "date_retired", value = NA) #Reset the retired date to NA
+    } else if (input$first_selection == "Manage sensors and log maintenance"){
+      updateSelectInput(session, "maintain_serial", choices = c("", instruments_data$maintainable$serial_no))
+      shinyjs::hide("submit_btn")
+      shinyjs::hide("add_sensor_name")
+      shinyjs::show("load_sensors")
+      sensors_sheet <- googlesheets4::read_sheet(sensors_id, sheet = "sensors") #Load the sensor sheet for when the user hits the load_sensors button
+      sensors_data$sensors <- sensors_sheet #assign to a reactive
     } else if (input$first_selection == "Calibrate"){
       shinyjs::show("submit_btn")
       updateSelectInput(session, "ID_sensor_holder", choices = instruments_data$others$serial_no)
@@ -183,6 +228,429 @@ app_server <- function(input, output, session) {
       updateNumericInput(session, "restart_index", min = 0, max = nrow(incomplete_observations))
     }
   })
+
+  ###observeEvents related to maintenance of instruments
+  observeEvent(input$maintain_serial, {
+    shinyjs::show("load_sensors")
+    shinyjs::hide("sensor1_show")
+    shinyjs::hide("sensor2_show")
+    shinyjs::hide("sensor3_show")
+    shinyjs::hide("sensor4_show")
+    shinyjs::hide("sensor5_show")
+    shinyjs::hide("sensor6_show")
+    shinyjs::hide("sensor7_show")
+    shinyjs::hide("sensor8_show")
+    shinyjs::hide("add_sensor")
+    shinyjs::hide("add_sensor_dropdown")
+    shinyjs::hide("add_sensor_name")
+    shinyjs::hide("sensor1_details")
+    shinyjs::hide("sensor2_details")
+    shinyjs::hide("sensor3_details")
+    shinyjs::hide("sensor4_details")
+    shinyjs::hide("sensor5_details")
+    shinyjs::hide("sensor6_details")
+    shinyjs::hide("sensor7_details")
+    shinyjs::hide("sensor8_details")
+    shinyjs::hide("change_sensor")
+    shinyjs::hide("add_comment")
+    shinyjs::hide("add.change_sensor.comment_name")
+    shinyjs::hide("add.change_sensor.comment")
+    #display a data.frame with the basic instrument data, allowing the user to confirm what they are loading
+    subset.instrument <- instruments_data$maintainable[instruments_data$maintainable$serial_no == input$maintain_serial , ]
+    sensors_data$instrument_table <- data.frame("Make" = subset.instrument$make,
+                                                "Model" = subset.instrument$model,
+                                                "Date in service" = subset.instrument$date_in_service,
+                                                "Retired" = subset.instrument$date_retired,
+                                                check.names = FALSE)
+    output$instrument_details <- renderTable({  #render the incomplete table if the user is on the proper panel
+      sensors_data$instrument_table
+    })
+    shinyjs::show("instrument_details") #if hidden because the user went and looked at sensors from another instrument
+  })
+  observeEvent(input$load_sensors, {
+    shinyjs::hide("load_sensors")
+    #Find the instrument_ID associated with this sensor
+    sensors_data$instrument_ID <-  instruments_data$maintainable[instruments_data$maintainable$serial_no == input$maintain_serial, "instrument_ID"]
+    #Find out the max number of sensors ever assigned to the instrument and what they currently are
+    sensors <- sensors_data$sensors[sensors_data$sensors$instrument_ID == sensors_data$instrument_ID , ]
+    sensors_data$sensor <- sensors[ , colSums(!is.na(sensors)) > 0] #Retain columns only if they have at least one entry, assign to reactive
+    sensors_data$datetime_exists <- TRUE %in% (sensors_data$sensor$obs_datetime %in% sensors_data$datetime)
+    shinyjs::show("add_sensor_dropdown")
+    sensors_data$number <- length(grep("sensor[1-8]_type", colnames(sensors_data$sensor)))
+    if (sensors_data$number > 0){
+      for (i in 1:sensors_data$number){ #show the right number of sensors
+        shinyjs::show(paste0("sensor", i, "_show"))
+        updateActionButton(session, paste0("sensor", i, "_show"), label = HTML(paste0("Sensor ", i, "<br>", sensors_data$sensor[nrow(sensors_data$sensor), paste0("sensor", i, "_type")])))
+        if (i == 8){
+          shinyjs::hide("add_sensor_dropdown")
+        }
+      }
+    }
+  })
+  observeEvent(input$add_sensor_dropdown, {
+    shinyjs::show("add_sensor")
+    shinyjs::show("add_sensor_name")
+  })
+  observeEvent(input$add_sensor, { # edit the data.table, making a new entry
+    comment <- paste0("Added a new sensor: ", input$add_sensor_dropdown, " added")
+    #find out if an entry already has the timestamp sensors_data$datetime. if not, new line.
+    if (sensors_data$datetime_exists){
+      #find the row number for that observation
+      row <- which(sensors_data$sensors$obs_datetime == sensors_data$datetime & sensors_data$sensors$instrument_ID == sensors_data$instrument_ID)+1
+      col_type <- which(colnames(sensors_data$sensors) == paste0("sensor", sensors_data$number + 1, "_type"))
+      col_type_letter <- stringr::str_to_upper(letters[col_type])
+      col_comment <- which(colnames(sensors_data$sensors) == paste0("sensor", sensors_data$number + 1, "_notes"))
+      col_comment_letter <- stringr::str_to_upper(letters[col_comment])
+      googlesheets4::range_write(sensors_id, sheet = "sensors", data = data.frame("type" = input$add_sensor_dropdown), range = paste0(col_type_letter, row) , col_names = FALSE)
+      googlesheets4::range_write(sensors_id, sheet = "sensors", data = data.frame("note" = comment), range = paste0(col_comment_letter, row) , col_names = FALSE)
+
+      #Append to the internal df to not have to read-in again
+      type_col <- paste0("sensor", sensors_data$number + 1, "_type")
+      notes_col <- paste0("sensor", sensors_data$number + 1, "_notes")
+      sensors_data$sensor$type_col <- NA #Create the new columns since new sensors
+      sensors_data$sensor$notes_col <- NA
+      sensors_data$sensor[sensors_data$sensor$obs_datetime == sensors_data$datetime, type_col] <- input$add_sensor_dropdown
+      sensors_data$sensor[sensors_data$sensor$obs_datetime == sensors_data$datetime, notes_col] <- comment
+      sensors_data$sensors[sensors_data$sensors$obs_datetime == sensors_data$datetime, type_col] <- input$add_sensor_dropdown
+      sensors_data$sensors[sensors_data$sensors$obs_datetime == sensors_data$datetime, notes_col] <- comment
+    } else { #append to sensors_id
+      df <- data.frame("instrument_ID" = sensors_data$instrument_ID,
+                       "observer" = input$add_sensor_name,
+                       "obs_datetime" = sensors_data$datetime,
+                       "sensor1_type" = if ("sensor1_type" %in% colnames(sensors_data$sensor)) sensors_data$sensor[nrow(sensors_data$sensor), "sensor1_type"] else NA,
+                       "sensor2_type" = if ("sensor2_type" %in% colnames(sensors_data$sensor)) sensors_data$sensor[nrow(sensors_data$sensor), "sensor2_type"] else NA,
+                       "sensor3_type" = if ("sensor3_type" %in% colnames(sensors_data$sensor)) sensors_data$sensor[nrow(sensors_data$sensor), "sensor3_type"] else NA,
+                       "sensor4_type" = if ("sensor4_type" %in% colnames(sensors_data$sensor)) sensors_data$sensor[nrow(sensors_data$sensor), "sensor4_type"] else NA,
+                       "sensor5_type" = if ("sensor5_type" %in% colnames(sensors_data$sensor)) sensors_data$sensor[nrow(sensors_data$sensor), "sensor5_type"] else NA,
+                       "sensor6_type" = if ("sensor6_type" %in% colnames(sensors_data$sensor)) sensors_data$sensor[nrow(sensors_data$sensor), "sensor6_type"] else NA,
+                       "sensor7_type" = if ("sensor7_type" %in% colnames(sensors_data$sensor)) sensors_data$sensor[nrow(sensors_data$sensor), "sensor7_type"] else NA,
+                       "sensor8_type" = if ("sensor8_type" %in% colnames(sensors_data$sensor)) sensors_data$sensor[nrow(sensors_data$sensor), "sensor8_type"] else NA,
+                       "sensor1_notes" = NA,
+                       "sensor2_notes" = NA,
+                       "sensor3_notes" = NA,
+                       "sensor4_notes" = NA,
+                       "sensor5_notes" = NA,
+                       "sensor6_notes" = NA,
+                       "sensor7_notes" = NA,
+                       "sensor8_notes" = NA)
+      df[1, paste0("sensor", sensors_data$number + 1, "_type")] <- input$add_sensor_dropdown
+      df[1, paste0("sensor", sensors_data$number + 1, "_notes")] <- comment
+      googlesheets4::sheet_append(sensors_id, sheet = "sensors", data = df)
+
+      #Append to the internal dfs to not have to read-in again
+      type_col <- paste0("sensor", sensors_data$number + 1, "_type")
+      notes_col <- paste0("sensor", sensors_data$number + 1, "_notes")
+      sensors_data$sensor[[type_col]] <- NA
+      sensors_data$sensor[[notes_col]] <- NA
+      sensors_data$sensor <- merge(sensors_data$sensor, df, all = TRUE, sort = FALSE)
+      sensors_data$sensors <- merge(sensors_data$sensors, df, all = TRUE, sort = FALSE)
+    }
+    shinyjs::show(paste0("sensor", sensors_data$number + 1, "_show")) # show the new sensor button
+    shinyjs::hide("add_sensor_name")
+    shinyjs::hide("add_sensor")
+    sensors_data$number <- sensors_data$number + 1
+    updateActionButton(session, paste0("sensor", sensors_data$number + 1, "_show"), label = HTML(paste0("Sensor ", i, "<br>", sensors_data$sensor[nrow(sensors_data$sensor), paste0("sensor", i, "_type")])))
+  })
+
+  observeEvent(input$sensor1_show, {
+    sensors_data$selected <- "sensor1"
+    sensors_data$sensor1_details <- data.frame("Time/date"= substr(sensors_data$sensor$obs_datetime, 1, 16),
+                                       "Type" = sensors_data$sensor$sensor1_type,
+                                       "Notes" = sensors_data$sensor$sensor1_notes,
+                                       check.names = FALSE)
+    sensors_data$sensor1_details <- sensors_data$sensor1_details[!is.na(sensors_data$sensor1_details$Notes), ]
+    output$sensor1_details <- renderTable({
+      sensors_data$sensor1_details
+    })
+    updateSelectInput(session, "change_sensor", selected = sensors_data$sensor[nrow(sensors_data$sensor), "sensor1_type"]) #reflects the type currenly on
+    if (sensors_data$datetime_exists){
+      updateTextAreaInput(session, "add_comment", value = sensors_data$sensor[nrow(sensors_data$sensor), "sensor1_note"]) #reflects the note associated with this session. User may have added a sensor and auto-generated a note, or is actually wanting to re-edit a note.
+      updateTextInput(session, "add.change_sensor.comment_name", value = sensors_data$sensor[nrow(sensors_data$sensor), "observer"])
+    }
+
+    shinyjs::hide("instrument_details")
+    shinyjs::show("sensor1_details")
+    shinyjs::hide("sensor2_details")
+    shinyjs::hide("sensor3_details")
+    shinyjs::hide("sensor4_details")
+    shinyjs::hide("sensor5_details")
+    shinyjs::hide("sensor6_details")
+    shinyjs::hide("sensor7_details")
+    shinyjs::hide("sensor8_details")
+    shinyjs::show("change_sensor")
+    shinyjs::show("add_comment")
+    shinyjs::show("add.change_sensor.comment_name")
+  })
+  observeEvent(input$sensor2_show, {
+    sensors_data$selected <- "sensor2"
+    sensors_data$sensor2_details <- data.frame("Time/date"= substr(sensors_data$sensor$obs_datetime, 1, 16),
+                                       "Type" = sensors_data$sensor$sensor2_type,
+                                       "Notes" = sensors_data$sensor$sensor2_notes,
+                                       check.names = FALSE)
+    sensors_data$sensor2_details <- sensors_data$sensor2_details[!is.na(sensors_data$sensor2_details$Notes), ]
+    output$sensor2_details <- renderTable({
+      sensors_data$sensor2_details
+    })
+    updateSelectInput(session, "change_sensor", selected = sensors_data$sensor[nrow(sensors_data$sensor), "sensor2_type"]) #reflects the type currently on
+    if (sensors_data$datetime_exists){
+      updateTextAreaInput(session, "add_comment", value = sensors_data$sensor[nrow(sensors_data$sensor), "sensor2_note"]) #reflects the note associated with this session. User may have added a sensor and auto-generated a note, or is actually wanting to re-edit a note.
+      updateTextInput(session, "add.change_sensor.comment_name", value = sensors_data$sensor[nrow(sensors_data$sensor), "observer"])
+    }
+    updateSelectInput(session, "change_sensor", selected = sensors_data$sensor$sensor2_type)
+    shinyjs::hide("instrument_details")
+    shinyjs::hide("sensor1_details")
+    shinyjs::show("sensor2_details")
+    shinyjs::hide("sensor3_details")
+    shinyjs::hide("sensor4_details")
+    shinyjs::hide("sensor5_details")
+    shinyjs::hide("sensor6_details")
+    shinyjs::hide("sensor7_details")
+    shinyjs::hide("sensor8_details")
+    shinyjs::show("change_sensor")
+    shinyjs::show("add_comment")
+    shinyjs::show("add.change_sensor.comment_name")
+  })
+  observeEvent(input$sensor3_show, {
+    sensors_data$selected <- "sensor3"
+    sensors_data$sensor3_details <- data.frame("Time/date"= substr(sensors_data$sensor$obs_datetime, 1, 16),
+                                       "Type" = sensors_data$sensor$sensor3_type,
+                                       "Notes" = sensors_data$sensor$sensor3_notes,
+                                       check.names = FALSE)
+    sensors_data$sensor3_details <- sensors_data$sensor3_details[!is.na(sensors_data$sensor3_details$Notes), ]
+    output$sensor3_details <- renderTable({
+      sensors_data$sensor3_details
+    })
+    updateSelectInput(session, "change_sensor", selected = sensors_data$sensor[nrow(sensors_data$sensor), "sensor3_type"]) #reflects the type currenly on
+    if (sensors_data$datetime_exists){
+      updateTextAreaInput(session, "add_comment", value = sensors_data$sensor[nrow(sensors_data$sensor), "sensor3_note"]) #reflects the note associated with this session. User may have added a sensor and auto-generated a note, or is actually wanting to re-edit a note.
+      updateTextInput(session, "add.change_sensor.comment_name", value = sensors_data$sensor[nrow(sensors_data$sensor), "observer"])
+    }
+    updateSelectInput(session, "change_sensor", selected = sensors_data$sensor$sensor3_type)
+    shinyjs::hide("instrument_details")
+    shinyjs::hide("sensor1_details")
+    shinyjs::hide("sensor2_details")
+    shinyjs::show("sensor3_details")
+    shinyjs::hide("sensor4_details")
+    shinyjs::hide("sensor5_details")
+    shinyjs::hide("sensor6_details")
+    shinyjs::hide("sensor7_details")
+    shinyjs::hide("sensor8_details")
+    shinyjs::show("change_sensor")
+    shinyjs::show("add_comment")
+    shinyjs::show("add.change_sensor.comment_name")
+  })
+  observeEvent(input$sensor4_show, {
+    sensors_data$selected <- "sensor4"
+    sensors_data$sensor4_details <- data.frame("Time/date"= substr(sensors_data$sensor$obs_datetime, 1, 16),
+                                       "Type" = sensors_data$sensor$sensor4_type,
+                                       "Notes" = sensors_data$sensor$sensor4_notes,
+                                       check.names = FALSE)
+    sensors_data$sensor4_details <- sensors_data$sensor4_details[!is.na(sensors_data$sensor4_details$Notes), ]
+    output$sensor4_details <- renderTable({
+      sensors_data$sensor4_details
+    })
+    updateSelectInput(session, "change_sensor", selected = sensors_data$sensor[nrow(sensors_data$sensor), "sensor4_type"]) #reflects the type currenly on
+    if (sensors_data$datetime_exists){
+      updateTextAreaInput(session, "add_comment", value = sensors_data$sensor[nrow(sensors_data$sensor), "sensor4_note"]) #reflects the note associated with this session. User may have added a sensor and auto-generated a note, or is actually wanting to re-edit a note.
+      updateTextInput(session, "add.change_sensor.comment_name", value = sensors_data$sensor[nrow(sensors_data$sensor), "observer"])
+    }
+    updateSelectInput(session, "change_sensor", selected = sensors_data$sensor$sensor4_type)
+    shinyjs::hide("instrument_details")
+    shinyjs::hide("sensor1_details")
+    shinyjs::hide("sensor2_details")
+    shinyjs::hide("sensor3_details")
+    shinyjs::show("sensor4_details")
+    shinyjs::hide("sensor5_details")
+    shinyjs::hide("sensor6_details")
+    shinyjs::hide("sensor7_details")
+    shinyjs::hide("sensor8_details")
+    shinyjs::show("change_sensor")
+    shinyjs::show("add_comment")
+    shinyjs::show("add.change_sensor.comment_name")
+  })
+  observeEvent(input$sensor5_show, {
+    sensors_data$selected <- "sensor5"
+    sensors_data$sensor5_details <- data.frame("Time/date"= substr(sensors_data$sensor$obs_datetime, 1, 16),
+                                       "Type" = sensors_data$sensor$sensor5_type,
+                                       "Notes" = sensors_data$sensor$sensor5_notes,
+                                       check.names = FALSE)
+    sensors_data$sensor5_details <- sensors_data$sensor5_details[!is.na(sensors_data$sensor5_details$Notes), ]
+    output$sensor5_details <- renderTable({
+      sensors_data$sensor5_details
+    })
+    updateSelectInput(session, "change_sensor", selected = sensors_data$sensor[nrow(sensors_data$sensor), "sensor5_type"]) #reflects the type currenly on
+    if (sensors_data$datetime_exists){
+      updateTextAreaInput(session, "add_comment", value = sensors_data$sensor[nrow(sensors_data$sensor), "sensor5_note"]) #reflects the note associated with this session. User may have added a sensor and auto-generated a note, or is actually wanting to re-edit a note.
+      updateTextInput(session, "add.change_sensor.comment_name", value = sensors_data$sensor[nrow(sensors_data$sensor), "observer"])
+    }
+    updateSelectInput(session, "change_sensor", selected = sensors_data$sensor$sensor5_type)
+    shinyjs::hide("instrument_details")
+    shinyjs::hide("sensor1_details")
+    shinyjs::hide("sensor2_details")
+    shinyjs::hide("sensor3_details")
+    shinyjs::hide("sensor4_details")
+    shinyjs::show("sensor5_details")
+    shinyjs::hide("sensor6_details")
+    shinyjs::hide("sensor7_details")
+    shinyjs::hide("sensor8_details")
+    shinyjs::show("change_sensor")
+    shinyjs::show("add_comment")
+    shinyjs::show("add.change_sensor.comment_name")
+  })
+  observeEvent(input$sensor6_show, {
+    sensors_data$selected <- "sensor6"
+    sensors_data$sensor6_details <- data.frame("Time/date"= substr(sensors_data$sensor$obs_datetime, 1, 16),
+                                       "Type" = sensors_data$sensor$sensor6_type,
+                                       "Notes" = sensors_data$sensor$sensor6_notes,
+                                       check.names = FALSE)
+    sensors_data$sensor6_details <- sensors_data$sensor6_details[!is.na(sensors_data$sensor6_details$Notes), ]
+    output$sensor6_details <- renderTable({
+      sensors_data$sensor6_details
+    })
+    updateSelectInput(session, "change_sensor", selected = sensors_data$sensor[nrow(sensors_data$sensor), "sensor6_type"]) #reflects the type currenly on
+    if (sensors_data$datetime_exists){
+      updateTextAreaInput(session, "add_comment", value = sensors_data$sensor[nrow(sensors_data$sensor), "sensor6_note"]) #reflects the note associated with this session. User may have added a sensor and auto-generated a note, or is actually wanting to re-edit a note.
+      updateTextInput(session, "add.change_sensor.comment_name", value = sensors_data$sensor[nrow(sensors_data$sensor), "observer"])
+    }
+    updateSelectInput(session, "change_sensor", selected = sensors_data$sensor$sensor6_type)
+    shinyjs::hide("instrument_details")
+    shinyjs::hide("sensor1_details")
+    shinyjs::hide("sensor2_details")
+    shinyjs::hide("sensor3_details")
+    shinyjs::hide("sensor4_details")
+    shinyjs::hide("sensor5_details")
+    shinyjs::show("sensor6_details")
+    shinyjs::hide("sensor7_details")
+    shinyjs::hide("sensor8_details")
+    shinyjs::show("change_sensor")
+    shinyjs::show("add_comment")
+    shinyjs::show("add.change_sensor.comment_name")
+  })
+  observeEvent(input$sensor7_show, {
+    sensors_data$selected <- "sensor7"
+    sensors_data$sensor7_details <- data.frame("Time/date"= substr(sensors_data$sensor$obs_datetime, 1, 16),
+                                       "Type" = sensors_data$sensor$sensor7_type,
+                                       "Notes" = sensors_data$sensor$sensor7_notes,
+                                       check.names = FALSE)
+    sensors_data$sensor7_details <- sensors_data$sensor7_details[!is.na(sensors_data$sensor7_details$Notes), ]
+    output$sensor7_details <- renderTable({
+      sensors_data$sensor7_details
+    })
+    updateSelectInput(session, "change_sensor", selected = sensors_data$sensor[nrow(sensors_data$sensor), "sensor7_type"]) #reflects the type currenly on
+    if (sensors_data$datetime_exists){
+      updateTextAreaInput(session, "add_comment", value = sensors_data$sensor[nrow(sensors_data$sensor), "sensor7_note"]) #reflects the note associated with this session. User may have added a sensor and auto-generated a note, or is actually wanting to re-edit a note.
+      updateTextInput(session, "add.change_sensor.comment_name", value = sensors_data$sensor[nrow(sensors_data$sensor), "observer"])
+    }
+    updateSelectInput(session, "change_sensor", selected = sensors_data$sensor$sensor7_type)
+    shinyjs::hide("instrument_details")
+    shinyjs::hide("sensor1_details")
+    shinyjs::hide("sensor2_details")
+    shinyjs::hide("sensor3_details")
+    shinyjs::hide("sensor4_details")
+    shinyjs::hide("sensor5_details")
+    shinyjs::hide("sensor6_details")
+    shinyjs::show("sensor7_details")
+    shinyjs::hide("sensor8_details")
+    shinyjs::show("change_sensor")
+    shinyjs::show("add_comment")
+    shinyjs::show("add.change_sensor.comment_name")
+  })
+  observeEvent(input$sensor8_show, {
+    sensors_data$selected <- "sensor8"
+    sensors_data$sensor8_details <- data.frame("Time/date"= substr(sensors_data$sensor$obs_datetime, 1, 16),
+                                       "Type" = sensors_data$sensor$sensor8_type,
+                                       "Notes" = sensors_data$sensor$sensor8_notes,
+                                       check.names = FALSE)
+    sensors_data$sensor8_details <- sensors_data$sensor8_details[!is.na(sensors_data$sensor8_details$Notes), ]
+    output$sensor8_details <- renderTable({
+      sensors_data$sensor8_details
+    })
+    updateSelectInput(session, "change_sensor", selected = sensors_data$sensor[nrow(sensors_data$sensor), "sensor8_type"]) #reflects the type currenly on
+    if (sensors_data$datetime_exists){
+      updateTextAreaInput(session, "add_comment", value = sensors_data$sensor[nrow(sensors_data$sensor), "sensor8_note"]) #reflects the note associated with this session. User may have added a sensor and auto-generated a note, or is actually wanting to re-edit a note.
+      updateTextInput(session, "add.change_sensor.comment_name", value = sensors_data$sensor[nrow(sensors_data$sensor), "observer"])
+    }
+    updateSelectInput(session, "change_sensor", selected = sensors_data$sensor$sensor8_type)
+    shinyjs::hide("instrument_details")
+    shinyjs::hide("sensor1_details")
+    shinyjs::hide("sensor2_details")
+    shinyjs::hide("sensor3_details")
+    shinyjs::hide("sensor4_details")
+    shinyjs::hide("sensor5_details")
+    shinyjs::hide("sensor6_details")
+    shinyjs::hide("sensor7_details")
+    shinyjs::show("sensor8_details")
+    shinyjs::show("change_sensor")
+    shinyjs::show("add_comment")
+    shinyjs::show("add.change_sensor.comment_name")
+  })
+
+  observeEvent(input$add.change_sensor.comment_name, {
+    shinyjs::show("add.change_sensor.comment") #Now you can save
+  })
+
+  observeEvent(input$add.change_sensor.comment, {
+    if (nchar(input$add.change_sensor.comment_name) <= 2 & nchar(input$add_comment) < 5){
+      shinyalert::shinyalert("Please fill in all fields!", type = "error", timer = 3000)
+    } else { #add the data
+      if (sensors_data$datetime_exists){
+        #find the row number for that observation
+        row <- which(sensors_data$sensors$obs_datetime == sensors_data$datetime & sensors_data$sensors$instrument_ID == sensors_data$instrument_ID)+1
+        col_type <- which(colnames(sensors_data$sensors) == paste0(sensors_data$selected, "_type"))
+        col_type_letter <- stringr::str_to_upper(letters[col_type])
+        col_comment <- which(colnames(sensors_data$sensors) == paste0(sensors_data$selected, "_notes"))
+        col_comment_letter <- stringr::str_to_upper(letters[col_comment])
+        googlesheets4::range_write(sensors_id, sheet = "sensors", data = data.frame("type" = input$change_sensor), range = paste0(col_type_letter, row) , col_names = FALSE)
+        googlesheets4::range_write(sensors_id, sheet = "sensors", data = data.frame("note" = input$add_comment), range = paste0(col_comment_letter, row) , col_names = FALSE)
+
+        #Append to the internal df to not have to read-in again
+        sensors_data$sensor[sensors_data$sensor$obs_datetime == sensors_data$datetime, type_col] <- input$change_sensor
+        sensors_data$sensor[sensors_data$sensor$obs_datetime == sensors_data$datetime, notes_col] <- input$add_comment
+        sensors_data$sensors[sensors_data$sensors$obs_datetime == sensors_data$datetime, type_col] <- input$change_sensor
+        sensors_data$sensors[sensors_data$sensors$obs_datetime == sensors_data$datetime, notes_col] <- input$add_comment
+
+      } else { #append to sensors with a new row
+        df <- data.frame("instrument_ID" = sensors_data$instrument_ID,
+                         "observer" = input$add.change_sensor.comment_name,
+                         "obs_datetime" = sensors_data$datetime,
+                         "sensor1_type" = if ("sensor1_type" %in% colnames(sensors_data$sensor)) sensors_data$sensor[nrow(sensors_data$sensor), "sensor1_type"] else NA,
+                         "sensor2_type" = if ("sensor2_type" %in% colnames(sensors_data$sensor)) sensors_data$sensor[nrow(sensors_data$sensor), "sensor2_type"] else NA,
+                         "sensor3_type" = if ("sensor3_type" %in% colnames(sensors_data$sensor)) sensors_data$sensor[nrow(sensors_data$sensor), "sensor3_type"] else NA,
+                         "sensor4_type" = if ("sensor4_type" %in% colnames(sensors_data$sensor)) sensors_data$sensor[nrow(sensors_data$sensor), "sensor4_type"] else NA,
+                         "sensor5_type" = if ("sensor5_type" %in% colnames(sensors_data$sensor)) sensors_data$sensor[nrow(sensors_data$sensor), "sensor5_type"] else NA,
+                         "sensor6_type" = if ("sensor6_type" %in% colnames(sensors_data$sensor)) sensors_data$sensor[nrow(sensors_data$sensor), "sensor6_type"] else NA,
+                         "sensor7_type" = if ("sensor7_type" %in% colnames(sensors_data$sensor)) sensors_data$sensor[nrow(sensors_data$sensor), "sensor7_type"] else NA,
+                         "sensor8_type" = if ("sensor8_type" %in% colnames(sensors_data$sensor)) sensors_data$sensor[nrow(sensors_data$sensor), "sensor8_type"] else NA,
+                         "sensor1_notes" = NA,
+                         "sensor2_notes" = NA,
+                         "sensor3_notes" = NA,
+                         "sensor4_notes" = NA,
+                         "sensor5_notes" = NA,
+                         "sensor6_notes" = NA,
+                         "sensor7_notes" = NA,
+                         "sensor8_notes" = NA)
+        df[1, paste0(sensors_data$selected, "_type")] <- input$change_sensor
+        df[1, paste0(sensors_data$selected, "_notes")] <- input$add_comment
+        googlesheets4::sheet_append(sensors_id, sheet = "sensors", data = df)
+
+        #Append to the internal df to not have to read-in again
+        sensors_data$sensor <- merge(sensors_data$sensor, df, all = TRUE, sort = FALSE)
+        sensors_data$sensors <- merge(sensors_data$sensors, df, all = TRUE, sort = FALSE)
+      }
+      table_name <- paste0(sensors_data$selected, "_details")
+      type_col <- paste0(sensors_data$selected, "_type")
+      notes_col <- paste0(sensors_data$selected, "_notes")
+      sensors_data[[table_name]] <- data.frame("Time/date"= substr(sensors_data$sensor$obs_datetime, 1, 16),
+                                                 "Type" = sensors_data$sensor[[type_col]],
+                                                 "Notes" = sensors_data$sensor[[notes_col]],
+                                                 check.names = FALSE)
+      sensors_data[[table_name]] <- sensors_data[[table_name]][!is.na(sensors_data[[table_name]]$Notes), ]
+      output[[table_name]] <- renderTable({ #render table again
+        sensors_data[[table_name]]
+      })
+    }
+  })
+
   observeEvent(input$existing_serial_no, { #populate fields as required
     if (input$existing_serial_no != "New record"){
       modify_record <- instruments_data$sheet[instruments_data$sheet$serial_no == input$existing_serial_no ,]
@@ -209,6 +677,7 @@ app_server <- function(input, output, session) {
       updateDateInput(session, "date_retired", value = NA)
     }
   })
+
   observeEvent(input$save_cal_instrument, { #save the new record or the changes to existing record
     if (nrow(instruments_data$sheet) == 0){
       new_id <- 1
@@ -228,8 +697,8 @@ app_server <- function(input, output, session) {
                                     make = input$make,
                                     model = input$model,
                                     type = input$type,
-                                    serial_no = input$serial_no,
-                                    asset_tag = input$asset_tag,
+                                    serial_no = gsub("[^[:alnum:]]", "", input$serial_no),
+                                    asset_tag = gsub("[^[:alnum:]]", "", input$asset_tag),
                                     date_in_service = if (length(input$date_in_service) == 0) NA else as.character(input$date_in_service),
                                     date_purchased = if (length(input$date_purchased) == 0) NA else as.character(input$date_purchased),
                                     retired_by = input$retired_by,
@@ -241,14 +710,15 @@ app_server <- function(input, output, session) {
       #find the row number for the existing observation
       instruments_data$sheet
       row <- which(instruments_data$sheet$serial_no == input$serial_no)+1
-      instrument.df <- data.frame(instrument_ID = new_id,
+      exist_id <- instruments_data$sheet[row-1, "instrument_ID"]
+      instrument.df <- data.frame(instrument_ID = exist_id,
                                   observer = input$recorder,
                                   obs_datetime = as.character(Sys.time()),
                                   make = input$make,
                                   model = input$model,
                                   type = input$type,
-                                  serial_no = input$serial_no,
-                                  asset_tag = input$asset_tag,
+                                  serial_no = gsub("[^[:alnum:]]", "", input$serial_no),
+                                  asset_tag = gsub("[^[:alnum:]]", "", input$asset_tag),
                                   date_in_service = if (length(input$date_in_service) == 0) NA else as.character(input$date_in_service),
                                   date_purchased = if (length(input$date_purchased) == 0) NA else as.character(input$date_purchased),
                                   retired_by = input$retired_by,
@@ -1256,8 +1726,7 @@ app_server <- function(input, output, session) {
   })
 
 
-  observeEvent({input$submit_btn
-  }, {
+  observeEvent({input$submit_btn}, {
     if (!("Basic info" %in% send_table$saved[ ,1] | "Basic info" %in% send_table$restarted_cal[ ,1])){
       shinyalert::shinyalert(title = "There is no basic information yet!!!", text = "Fill in your name, calibration time and date, and required serial numbers.", type = "error")
     } else if (!("Temperature calibration" %in% send_table$saved[ ,1] | "Temperature calibration" %in% send_table$restarted_cal[ ,1])){
