@@ -212,7 +212,7 @@ app_ui <- function(request) {
           ),
           conditionalPanel(
             condition = "input.first_selection == 'View unfinished calibrations'",
-            tableOutput("incomplete_table")
+            DT::dataTableOutput("incomplete_table")
           ),
           conditionalPanel(
             condition = "input.first_selection == 'Manage instruments'",
@@ -221,15 +221,15 @@ app_ui <- function(request) {
           conditionalPanel(
             condition = "input.first_selection == 'Manage sensors and log maintenance'",
             tableOutput("instrument_details"), #This table will show up first to allow the user to select the right instrument
-            tableOutput("sensor1_details"), # this and subsequent sensors are hidden until the user selects to view
-            tableOutput("sensor2_details"),
-            tableOutput("sensor3_details"),
-            tableOutput("sensor4_details"),
-            tableOutput("sensor5_details"),
-            tableOutput("sensor6_details"),
-            tableOutput("sensor7_details"),
-            tableOutput("sensor8_details"),
-            selectInput("change_sensor", "Assign a new sensor", choices = c("pH", "pH/ORP", "ORP", "Conductivity", "Turbidity", "Temperature", "DO", "Depth", "Nitrate", "Ammonium", "Chloride" , "DOM", "Rhodamine", "Total algae")),
+            DT::dataTableOutput("sensor1_details"), # this and subsequent sensors are hidden until the user selects to view
+            DT::dataTableOutput("sensor2_details"),
+            DT::dataTableOutput("sensor3_details"),
+            DT::dataTableOutput("sensor4_details"),
+            DT::dataTableOutput("sensor5_details"),
+            DT::dataTableOutput("sensor6_details"),
+            DT::dataTableOutput("sensor7_details"),
+            DT::dataTableOutput("sensor8_details"),
+            selectInput("change_sensor", "Assign a new sensor", choices = c("", "pH", "pH/ORP", "ORP", "Conductivity/Temperature", "Conductivity", "Turbidity", "Temperature", "DO", "Depth", "Nitrate", "Ammonium", "Chloride" , "DOM", "Rhodamine", "Total algae")),
             textInput("add_sensor_serial", "Serial number", ""),
             textAreaInput("add_comment", "Add a note", "", height = "100px"),
             textInput("add.change_sensor.comment_name", "What's your name?"),

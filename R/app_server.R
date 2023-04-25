@@ -165,6 +165,7 @@ app_server <- function(input, output, session) {
   instruments_id <- googledrive::drive_get("calibrations/instruments")$id
   sensors_id <- googledrive::drive_get("calibrations/sensors")$id
   instruments_sheet <- googlesheets4::read_sheet(instruments_id, sheet = "instruments")
+  instruments_sheet <- as.data.frame(instruments_sheet)
   instruments_data$sheet <- instruments_sheet #assign to a reactive
   instruments_data$handhelds <- instruments_sheet[instruments_sheet$type == "Handheld (connects to bulkheads)" & is.na(instruments_sheet$date_retired) , ]
   instruments_data$others <- instruments_sheet[instruments_sheet$type != "Handheld (connects to bulkheads)" & is.na(instruments_sheet$date_retired) , ]
@@ -172,6 +173,7 @@ app_server <- function(input, output, session) {
 
   # query the observations sheet for increment number and unfinished calibrations
   observations <- googlesheets4::read_sheet(calibrations_id, sheet = "observations")
+  observations <- as.data.frame(observations)
   calibration_data$next_id <- max(observations$observation_ID) + 1  # find out the new observation ID number
 
   # find out if any calibrations are labelled as incomplete
@@ -255,8 +257,11 @@ app_server <- function(input, output, session) {
       shinyjs::hide("new_sensor_serial")
       shinyjs::hide("add.change_sensor.comment")
       shinyjs::show("load_sensors")
-      sensors_sheet <- googlesheets4::read_sheet(sensors_id, sheet = "sensors") #Load the sensor sheet for when the user hits the load_sensors button
-      sensors_data$sensors <- sensors_sheet #assign to a reactive
+      if (is.null(sensors_data$sensors)){
+        sensors_sheet <- googlesheets4::read_sheet(sensors_id, sheet = "sensors") #Load the sensor sheet for when the user hits the load_sensors button
+        sensors_sheet <- as.data.frame(sensors_sheet)
+        sensors_data$sensors <- sensors_sheet #assign to a reactive
+      }
     } else if (input$first_selection == "Calibrate"){
       shinyjs::show("submit_btn")
       shinyjs::show("load_sensors")
@@ -368,7 +373,7 @@ app_server <- function(input, output, session) {
   observeEvent(input$load_sensors, {
     shinyjs::hide("load_sensors")
     #Find the instrument_ID associated with this instrument
-    sensors_data$instrument_ID <-  instruments_data$maintainable[instruments_data$maintainable$serial_no == input$maintain_serial, "instrument_ID"]$instrument_ID
+    sensors_data$instrument_ID <-  instruments_data$maintainable[instruments_data$maintainable$serial_no == input$maintain_serial, "instrument_ID"]
     #Find out the max number of sensors ever assigned to the instrument and what they currently are
     sensors <- sensors_data$sensors[sensors_data$sensors$instrument_ID == sensors_data$instrument_ID , ]
     sensors_data$sensor <- sensors[ , colSums(!is.na(sensors)) > 0] #Retain columns only if they have at least one entry, assign to reactive
@@ -491,12 +496,11 @@ app_server <- function(input, output, session) {
                                        "Notes" = sensors_data$sensor$sensor1_notes,
                                        check.names = FALSE)
     sensors_data$sensor1_details <- sensors_data$sensor1_details[!is.na(sensors_data$sensor1_details$Notes), ]
-    output$sensor1_details <- renderTable({
+    output$sensor1_details <- DT::renderDataTable({
       sensors_data$sensor1_details
-    }, digits = 0)
-
+    })
     updateSelectInput(session, "change_sensor", selected = sensors_data$sensor[nrow(sensors_data$sensor), "sensor1_type"]) #reflects the type currently on
-    updateTextInput(session, "add_sensor_serial", value = sensors_data$sensor[nrow(sensors_data$sensor), "sensor1_serial"]$sensor1_serial)
+    updateTextInput(session, "add_sensor_serial", value = sensors_data$sensor[nrow(sensors_data$sensor), "sensor1_serial"])
     if (sensors_data$datetime_exists){
       if (sensors_data$sensor[sensors_data$sensor$obs_datetime == sensors_data$datetime, "instrument_ID"] == sensors_data$instrument_ID) {
       updateTextAreaInput(session, "add_comment", value = sensors_data$sensor[nrow(sensors_data$sensor), "sensor1_note"]) #reflects the note associated with this session. User may have added a sensor and auto-generated a note, or is actually wanting to edit a note.
@@ -526,11 +530,11 @@ app_server <- function(input, output, session) {
                                        "Notes" = sensors_data$sensor$sensor2_notes,
                                        check.names = FALSE)
     sensors_data$sensor2_details <- sensors_data$sensor2_details[!is.na(sensors_data$sensor2_details$Notes), ]
-    output$sensor2_details <- renderTable({
+    output$sensor2_details <- DT::renderDataTable({
       sensors_data$sensor2_details
-    }, digits = 0)
+    })
     updateSelectInput(session, "change_sensor", selected = sensors_data$sensor[nrow(sensors_data$sensor), "sensor2_type"]) #reflects the type currently on
-    updateTextInput(session, "add_sensor_serial", value = sensors_data$sensor[nrow(sensors_data$sensor), "sensor2_serial"]$sensor2_serial)
+    updateTextInput(session, "add_sensor_serial", value = sensors_data$sensor[nrow(sensors_data$sensor), "sensor2_serial"])
     if (sensors_data$datetime_exists){
       if (sensors_data$sensor[sensors_data$sensor$obs_datetime == sensors_data$datetime, "instrument_ID"] == sensors_data$instrument_ID) {
         updateTextAreaInput(session, "add_comment", value = sensors_data$sensor[nrow(sensors_data$sensor), "sensor2_note"]) #reflects the note associated with this session. User may have added a sensor and auto-generated a note, or is actually wanting to re-edit a note.
@@ -560,11 +564,11 @@ app_server <- function(input, output, session) {
                                        "Notes" = sensors_data$sensor$sensor3_notes,
                                        check.names = FALSE)
     sensors_data$sensor3_details <- sensors_data$sensor3_details[!is.na(sensors_data$sensor3_details$Notes), ]
-    output$sensor3_details <- renderTable({
+    output$sensor3_details <- DT::renderDataTable({
       sensors_data$sensor3_details
-    }, digits = 0)
+    })
     updateSelectInput(session, "change_sensor", selected = sensors_data$sensor[nrow(sensors_data$sensor), "sensor3_type"]) #reflects the type currenly on
-    updateTextInput(session, "add_sensor_serial", value = sensors_data$sensor[nrow(sensors_data$sensor), "sensor3_serial"]$sensor3_serial)
+    updateTextInput(session, "add_sensor_serial", value = sensors_data$sensor[nrow(sensors_data$sensor), "sensor3_serial"])
     if (sensors_data$datetime_exists){
       if (sensors_data$sensor[sensors_data$sensor$obs_datetime == sensors_data$datetime, "instrument_ID"] == sensors_data$instrument_ID) {
         updateTextAreaInput(session, "add_comment", value = sensors_data$sensor[nrow(sensors_data$sensor), "sensor3_note"]) #reflects the note associated with this session. User may have added a sensor and auto-generated a note, or is actually wanting to re-edit a note.
@@ -594,11 +598,11 @@ app_server <- function(input, output, session) {
                                        "Notes" = sensors_data$sensor$sensor4_notes,
                                        check.names = FALSE)
     sensors_data$sensor4_details <- sensors_data$sensor4_details[!is.na(sensors_data$sensor4_details$Notes), ]
-    output$sensor4_details <- renderTable({
+    output$sensor4_details <- DT::renderDataTable({
       sensors_data$sensor4_details
-    }, digits = 0)
+    })
     updateSelectInput(session, "change_sensor", selected = sensors_data$sensor[nrow(sensors_data$sensor), "sensor4_type"]) #reflects the type currenly on
-    updateTextInput(session, "add_sensor_serial", value = sensors_data$sensor[nrow(sensors_data$sensor), "sensor4_serial"]$sensor4_serial)
+    updateTextInput(session, "add_sensor_serial", value = sensors_data$sensor[nrow(sensors_data$sensor), "sensor4_serial"])
     if (sensors_data$datetime_exists){
       if (sensors_data$sensor[sensors_data$sensor$obs_datetime == sensors_data$datetime, "instrument_ID"] == sensors_data$instrument_ID) {
         updateTextAreaInput(session, "add_comment", value = sensors_data$sensor[nrow(sensors_data$sensor), "sensor4_note"]) #reflects the note associated with this session. User may have added a sensor and auto-generated a note, or is actually wanting to re-edit a note.
@@ -628,11 +632,11 @@ app_server <- function(input, output, session) {
                                        "Notes" = sensors_data$sensor$sensor5_notes,
                                        check.names = FALSE)
     sensors_data$sensor5_details <- sensors_data$sensor5_details[!is.na(sensors_data$sensor5_details$Notes), ]
-    output$sensor5_details <- renderTable({
+    output$sensor5_details <- DT::renderDataTable({
       sensors_data$sensor5_details
-    }, digits = 0)
+    })
     updateSelectInput(session, "change_sensor", selected = sensors_data$sensor[nrow(sensors_data$sensor), "sensor5_type"]) #reflects the type currenly on
-    updateTextInput(session, "add_sensor_serial", value = sensors_data$sensor[nrow(sensors_data$sensor), "sensor5_serial"]$sensor5_serial)
+    updateTextInput(session, "add_sensor_serial", value = sensors_data$sensor[nrow(sensors_data$sensor), "sensor5_serial"])
     if (sensors_data$datetime_exists){
       if (sensors_data$sensor[sensors_data$sensor$obs_datetime == sensors_data$datetime, "instrument_ID"] == sensors_data$instrument_ID) {
         updateTextAreaInput(session, "add_comment", value = sensors_data$sensor[nrow(sensors_data$sensor), "sensor5_note"]) #reflects the note associated with this session. User may have added a sensor and auto-generated a note, or is actually wanting to re-edit a note.
@@ -662,11 +666,11 @@ app_server <- function(input, output, session) {
                                        "Notes" = sensors_data$sensor$sensor6_notes,
                                        check.names = FALSE)
     sensors_data$sensor6_details <- sensors_data$sensor6_details[!is.na(sensors_data$sensor6_details$Notes), ]
-    output$sensor6_details <- renderTable({
+    output$sensor6_details <- DT::renderDataTable({
       sensors_data$sensor6_details
-    }, digits = 0)
+    })
     updateSelectInput(session, "change_sensor", selected = sensors_data$sensor[nrow(sensors_data$sensor), "sensor6_type"]) #reflects the type currenly on
-    updateTextInput(session, "add_sensor_serial", value = sensors_data$sensor[nrow(sensors_data$sensor), "sensor6_serial"]$sensor6_serial)
+    updateTextInput(session, "add_sensor_serial", value = sensors_data$sensor[nrow(sensors_data$sensor), "sensor6_serial"])
     if (sensors_data$datetime_exists){
       if (sensors_data$sensor[sensors_data$sensor$obs_datetime == sensors_data$datetime, "instrument_ID"] == sensors_data$instrument_ID) {
         updateTextAreaInput(session, "add_comment", value = sensors_data$sensor[nrow(sensors_data$sensor), "sensor6_note"]) #reflects the note associated with this session. User may have added a sensor and auto-generated a note, or is actually wanting to re-edit a note.
@@ -696,11 +700,11 @@ app_server <- function(input, output, session) {
                                        "Notes" = sensors_data$sensor$sensor7_notes,
                                        check.names = FALSE)
     sensors_data$sensor7_details <- sensors_data$sensor7_details[!is.na(sensors_data$sensor7_details$Notes), ]
-    output$sensor7_details <- renderTable({
+    output$sensor7_details <- DT::renderDataTable({
       sensors_data$sensor7_details
-    }, digits = 0)
+    })
     updateSelectInput(session, "change_sensor", selected = sensors_data$sensor[nrow(sensors_data$sensor), "sensor7_type"]) #reflects the type currently on
-    updateTextInput(session, "add_sensor_serial", value = sensors_data$sensor[nrow(sensors_data$sensor), "sensor7_serial"]$sensor7_serial)
+    updateTextInput(session, "add_sensor_serial", value = sensors_data$sensor[nrow(sensors_data$sensor), "sensor7_serial"])
     if (sensors_data$datetime_exists){
       if (sensors_data$sensor[sensors_data$sensor$obs_datetime == sensors_data$datetime, "instrument_ID"] == sensors_data$instrument_ID) {
         updateTextAreaInput(session, "add_comment", value = sensors_data$sensor[nrow(sensors_data$sensor), "sensor7_note"]) #reflects the note associated with this session. User may have added a sensor and auto-generated a note, or is actually wanting to re-edit a note.
@@ -730,11 +734,11 @@ app_server <- function(input, output, session) {
                                        "Notes" = sensors_data$sensor$sensor8_notes,
                                        check.names = FALSE)
     sensors_data$sensor8_details <- sensors_data$sensor8_details[!is.na(sensors_data$sensor8_details$Notes), ]
-    output$sensor8_details <- renderTable({
+    output$sensor8_details <- DT::renderDataTable({
       sensors_data$sensor8_details
-    }, digits = 0)
+    })
     updateSelectInput(session, "change_sensor", selected = sensors_data$sensor[nrow(sensors_data$sensor), "sensor8_type"]) #reflects the type currenly on
-    updateTextInput(session, "add_sensor_serial", value = sensors_data$sensor[nrow(sensors_data$sensor), "sensor8_serial"]$sensor8_serial)
+    updateTextInput(session, "add_sensor_serial", value = sensors_data$sensor[nrow(sensors_data$sensor), "sensor8_serial"])
     if (sensors_data$datetime_exists){
       if (sensors_data$sensor[sensors_data$sensor$obs_datetime == sensors_data$datetime, "instrument_ID"] == sensors_data$instrument_ID) {
         updateTextAreaInput(session, "add_comment", value = sensors_data$sensor[nrow(sensors_data$sensor), "sensor8_note"]) #reflects the note associated with this session. User may have added a sensor and auto-generated a note, or is actually wanting to re-edit a note.
@@ -774,7 +778,7 @@ app_server <- function(input, output, session) {
           col_type_letter <- stringr::str_to_upper(letters[col_type])
           col_comment <- which(colnames(sensors_data$sensors) == paste0(sensors_data$selected, "_notes"))
           col_comment_letter <- stringr::str_to_upper(letters[col_comment])
-          col_serial <- which(colnames(sensors_data$sensors) == paste0("sensor", sensors_data$number + 1, "_serial"))
+          col_serial <- which(colnames(sensors_data$sensors) == paste0(sensors_data$selected, "_serial"))
           col_serial_letter <- stringr::str_to_upper(letters[col_serial])
           googlesheets4::range_write(sensors_id, sheet = "sensors", data = data.frame("type" = input$change_sensor), range = paste0(col_type_letter, row) , col_names = FALSE, reformat = FALSE)
           googlesheets4::range_write(sensors_id, sheet = "sensors", data = data.frame("note" = input$add_comment), range = paste0(col_comment_letter, row) , col_names = FALSE, reformat = FALSE)
@@ -830,6 +834,7 @@ app_server <- function(input, output, session) {
         sensors_data$sensor <- merge(sensors_data$sensor, df, all = TRUE, sort = FALSE)
         sensors_data$sensors <- merge(sensors_data$sensors, df, all = TRUE, sort = FALSE)
       }
+      #render table again and update buttons
       table_name <- paste0(sensors_data$selected, "_details")
       type_col <- paste0(sensors_data$selected, "_type")
       notes_col <- paste0(sensors_data$selected, "_notes")
@@ -840,11 +845,13 @@ app_server <- function(input, output, session) {
                                                  "Notes" = sensors_data$sensor[[notes_col]],
                                                  check.names = FALSE)
       sensors_data[[table_name]] <- sensors_data[[table_name]][!is.na(sensors_data[[table_name]]$Notes), ]
-      output[[table_name]] <- renderTable({ #render table again
+      output[[table_name]] <- DT::renderDataTable({ #render table again
         sensors_data[[table_name]]
-      }, digits = 0)
+      })
+      lab <- paste0("Sensor ", gsub("\\D", "", sensors_data$selected), "<br>", sensors_data$sensor[nrow(sensors_data$sensor), type_col])
+      updateActionButton(session, paste0("sensor", gsub("\\D", "", sensors_data$selected), "_show"), label = HTML(lab))
+      sensors_data$datetime_exists <- TRUE
     }
-    sensors_data$datetime_exists <- TRUE
   })
 
   observeEvent(input$existing_serial_no, { #populate fields as required
@@ -924,6 +931,7 @@ app_server <- function(input, output, session) {
     }
     #Reload the instruments sheet to reflect modifications
     instruments_sheet <- googlesheets4::read_sheet(instruments_id, sheet = "instruments")
+    instruments_sheet <- as.data.frame(instruments_sheet)
     instruments_data$sheet <- instruments_sheet #assign to a reactive again
     instruments_data$handhelds <- instruments_sheet[instruments_sheet$type == "Handheld (connects to bulkheads)" & is.na(instruments_sheet$date_retired) , ]
     instruments_data$others <- instruments_sheet[instruments_sheet$type != "Handheld (connects to bulkheads)" & is.na(instruments_sheet$date_retired) , ]
@@ -942,16 +950,17 @@ app_server <- function(input, output, session) {
       calibration_data$next_id <- incomplete_ID
       calibration_data$restarted_id <- incomplete_ID
       # Reset the basic fields according to recovered info
-      updateTextInput(session, "observer", value = incomplete_observations[restart_value , "observer"]$observer)
-      updateDateInput(session, "obs_date", value = as.Date(incomplete_observations[restart_value , "obs_date"]$obs_date))
-      shinyTime::updateTimeInput(session, "obs_time", value = as.POSIXct(incomplete_observations[restart_value , "obs_time"]$obs_time))
-      updateTextInput(session, "ID_sensor_holder", value = incomplete_observations[restart_value , "ID_sensor_holder"]$ID_sensor_holder)
-      updateTextInput(session, "ID_handheld_meter", value = incomplete_observations[restart_value , "ID_handheld_meter"]$ID_handheld_meter)
+      updateTextInput(session, "observer", value = incomplete_observations[restart_value , "observer"])
+      updateDateInput(session, "obs_date", value = as.Date(incomplete_observations[restart_value , "obs_date"]))
+      shinyTime::updateTimeInput(session, "obs_time", value = as.POSIXct(incomplete_observations[restart_value , "obs_time"]))
+      updateTextInput(session, "ID_sensor_holder", value = incomplete_observations[restart_value , "ID_sensor_holder"])
+      updateTextInput(session, "ID_handheld_meter", value = incomplete_observations[restart_value , "ID_handheld_meter"])
 
       # Search for entries in parameter-specific sheets with the same observation_ID and update the fields
       calibration_sheets <- googlesheets4::sheet_names(calibrations_id)
       for (i in calibration_sheets[calibration_sheets != "observations"]) {
         sheet <- googlesheets4::read_sheet(calibrations_id, sheet = i)
+        sheet <- as.data.frame(sheet)
         sheet <- sheet[sheet$observation_ID == incomplete_ID , ]
         if (nrow(sheet) == 1){
           if (i == "temperature"){
@@ -1049,6 +1058,7 @@ app_server <- function(input, output, session) {
       calibration_sheets <- googlesheets4::sheet_names(calibrations_id)
       for (i in calibration_sheets){
         sheet <- googlesheets4::read_sheet(calibrations_id, sheet = i)
+        sheet <- as.data.frame(sheet)
         if (nrow(sheet[sheet$observation_ID == delete_ID , ]) == 1){
           row <- which(sheet$observation_ID == calibration_data$next_id)+1
           googlesheets4::range_clear(calibrations_id, sheet = i,range = paste0(row, ":", row))
@@ -1061,7 +1071,7 @@ app_server <- function(input, output, session) {
                                           "date/time" = "No unsaved calibrations!",
                                           check.names = FALSE)
       }
-      output$incomplete_table <- renderTable({  #render the incomplete table again
+      output$incomplete_table <- DT::renderDataTable({  #render the incomplete table again
         complete$incomplete
       })
       #reset internal markers of completness
@@ -1403,6 +1413,7 @@ app_server <- function(input, output, session) {
         shinyjs::show("delete_pH")
       } else {
         pH_sheet <- googlesheets4::read_sheet(calibrations_id, sheet = "pH")
+        pH_sheet <- as.data.frame(pH_sheet)
         row <- which(pH_sheet$observation_ID == calibration_data$next_id)+1
         googlesheets4::range_write(calibrations_id, data = calibration_data$pH, sheet = "pH", range = paste0("A", row), col_names = FALSE, reformat = FALSE)
       }
@@ -1440,6 +1451,7 @@ app_server <- function(input, output, session) {
     shinyalert::shinyalert("Deleting...", type = "info")
     #delete on remote sheet
     pH_sheet <- googlesheets4::read_sheet(calibrations_id, sheet = "pH")
+    pH_sheet <- as.data.frame(pH_sheet)
     row <- which(pH_sheet$observation_ID == calibration_data$next_id)+1
     googlesheets4::range_clear(calibrations_id, sheet = "pH", range = paste0(row, ":", row))
     #reset the fields
@@ -1479,6 +1491,7 @@ app_server <- function(input, output, session) {
         shinyjs::show("delete_temp")
       } else {
         temp_sheet <- googlesheets4::read_sheet(calibrations_id, sheet = "temperature")
+        temp_sheet <- as.data.frame(temp_sheet)
         row <- which(temp_sheet$observation_ID == calibration_data$next_id)+1
         googlesheets4::range_write(calibrations_id, data = calibration_data$temp, sheet = "temperature", range = paste0("A", row), col_names = FALSE, reformat = FALSE)
       }
@@ -1515,6 +1528,7 @@ app_server <- function(input, output, session) {
   observeEvent(input$delete_temp, {
     shinyalert::shinyalert("Deleting...", type = "info")
     temp_sheet <- googlesheets4::read_sheet(calibrations_id, sheet = "temperature")
+    temp_sheet <- as.data.frame(temp_sheet)
     row <- which(temp_sheet$observation_ID == calibration_data$next_id)+1
     googlesheets4::range_clear(calibrations_id, sheet = "temperature", range = paste0(row, ":", row))
     #reset the fields
@@ -1554,6 +1568,7 @@ app_server <- function(input, output, session) {
         shinyjs::show("delete_orp")
       } else {
         orp_sheet <- googlesheets4::read_sheet(calibrations_id, sheet = "ORP")
+        ORP_sheet <- as.data.frame(ORP_sheet)
         row <- which(orp_sheet$observation_ID == calibration_data$next_id)+1
         googlesheets4::range_write(calibrations_id, data = calibration_data$orp, sheet = "ORP", range = paste0("A", row), col_names = FALSE, reformat = FALSE)
       }
@@ -1590,6 +1605,7 @@ app_server <- function(input, output, session) {
   observeEvent(input$delete_orp, {
     shinyalert::shinyalert("Deleting...", type = "info")
     orp_sheet <- googlesheets4::read_sheet(calibrations_id, sheet = "ORP")
+    ORP_sheet <- as.data.frame(ORP_sheet)
     row <- which(orp_sheet$observation_ID == calibration_data$next_id)+1
     googlesheets4::range_clear(calibrations_id, sheet = "ORP", range = paste0(row, ":", row))
     #reset the fields
@@ -1632,6 +1648,7 @@ app_server <- function(input, output, session) {
         shinyjs::show("delete_SpC")
       } else {
         SpC_sheet <- googlesheets4::read_sheet(calibrations_id, sheet = "SpC")
+        SpC_sheet <- as.data.frame(SpC_sheet)
         row <- which(SpC_sheet$observation_ID == calibration_data$next_id)+1
         googlesheets4::range_write(calibrations_id, data = calibration_data$SpC, sheet = "SpC", range = paste0("A", row), col_names = FALSE, reformat = FALSE)
       }
@@ -1667,8 +1684,9 @@ app_server <- function(input, output, session) {
   })
   observeEvent(input$delete_SpC, {
     shinyalert::shinyalert("Deleting...", type = "info")
-    spc_sheet <- googlesheets4::read_sheet(calibrations_id, sheet = "SpC")
-    row <- which(spc_sheet$observation_ID == calibration_data$next_id)+1
+    SpC_sheet <- googlesheets4::read_sheet(calibrations_id, sheet = "SpC")
+    SpC_sheet <- as.data.frame(SpC_sheet)
+    row <- which(SpC_sheet$observation_ID == calibration_data$next_id)+1
     googlesheets4::range_clear(calibrations_id, sheet = "SpC", range = paste0(row, ":", row))
     #reset the fields
     reset_spc()
@@ -1709,8 +1727,9 @@ app_server <- function(input, output, session) {
         complete$turbidity <- TRUE
         shinyjs::show("delete_turb")
       } else {
-        turbidity_sheet <- googlesheets4::read_sheet(calibrations_id, sheet = "turbidity")
-        row <- which(turbidity_sheet$observation_ID == calibration_data$next_id)+1
+        turb_sheet <- googlesheets4::read_sheet(calibrations_id, sheet = "turbidity")
+        turb_sheet <- as.data.frame(turb_sheet)
+        row <- which(turb_sheet$observation_ID == calibration_data$next_id)+1
         googlesheets4::range_write(calibrations_id, data = calibration_data$turb, sheet = "turbidity", range = paste0("A", row), col_names = FALSE, reformat = FALSE)
       }
       if (!complete$basic){
@@ -1746,6 +1765,7 @@ app_server <- function(input, output, session) {
   observeEvent(input$delete_turb, {
     shinyalert::shinyalert("Deleting...", type = "info")
     turb_sheet <- googlesheets4::read_sheet(calibrations_id, sheet = "turbidity")
+    turb_sheet <-  as.data.frame(turb_sheet)
     row <- which(turb_sheet$observation_ID == calibration_data$next_id)+1
     googlesheets4::range_clear(calibrations_id, sheet = "turbidity", range = paste0(row, ":", row))
     #reset the fields
@@ -1786,6 +1806,7 @@ app_server <- function(input, output, session) {
         shinyjs::show("delete_DO")
       } else {
         DO_sheet <- googlesheets4::read_sheet(calibrations_id, sheet = "DO")
+        DO_sheet <- as.data.frame(DO_sheet)
         row <- which(DO_sheet$observation_ID == calibration_data$next_id)+1
         googlesheets4::range_write(calibrations_id, data = calibration_data$DO, sheet = "DO", range = paste0("A", row), col_names = FALSE, reformat = FALSE)
       }
@@ -1822,6 +1843,7 @@ app_server <- function(input, output, session) {
   observeEvent(input$delete_DO, {
     shinyalert::shinyalert("Deleting...", type = "info")
     DO_sheet <- googlesheets4::read_sheet(calibrations_id, sheet = "DO")
+    DO_sheet <- as.data.frame(DO_sheet)
     row <- which(DO_sheet$observation_ID == calibration_data$next_id)+1
     googlesheets4::range_clear(calibrations_id, sheet = "DO", range = paste0(row, ":", row))
     #reset the fields
@@ -1860,6 +1882,7 @@ app_server <- function(input, output, session) {
         shinyjs::show("delete_depth")
       } else {
         depth_sheet <- googlesheets4::read_sheet(calibrations_id, sheet = "depth")
+        depth_sheet <- as.data.frame(depth_sheet)
         row <- which(depth_sheet$observation_ID == calibration_data$next_id)+1
         googlesheets4::range_write(calibrations_id, data = calibration_data$depth, sheet = "depth", range = paste0("A", row), col_names = FALSE, reformat = FALSE)
       }
@@ -1896,6 +1919,7 @@ app_server <- function(input, output, session) {
   observeEvent(input$delete_depth, {
     shinyalert::shinyalert("Deleting...", type = "info")
     depth_sheet <- googlesheets4::read_sheet(calibrations_id, sheet = "depth")
+    depth_sheet <- as.data.frame(depth_sheet)
     row <- which(depth_sheet$observation_ID == calibration_data$next_id)+1
     googlesheets4::range_clear(calibrations_id, sheet = "depth", range = paste0(row, ":", row))
     #reset the fields
@@ -1932,6 +1956,7 @@ app_server <- function(input, output, session) {
                              callbackR = function(x) {
                                if (x) {# Mark it as complete == TRUE. Read in observations again as the sheet now has a new row or a row that is being edited from incomplete calibration.
                                  observations <- googlesheets4::read_sheet(calibrations_id, sheet = "observations")
+                                 observations <- as.data.frame(observations)
                                  googlesheets4::range_write(calibrations_id, data = data.frame(complete = TRUE), sheet = "observations", range = paste0("G", which(observations$observation_ID == calibration_data$next_id)+1), col_names = FALSE, reformat = FALSE)
                                  shinyalert::shinyalert(title = paste0("Calibration finalized."),
                                                         type = "success", immediate = TRUE)
