@@ -44,7 +44,7 @@ app_ui <- function(request) {
           conditionalPanel(
             condition = "input.first_selection == 'Manage instruments'",
             selectInput("existing_serial_no", "Search existing serial numbers", choices = "New record"),
-            textInput("serial_no", "New or target serial No", value = "Search first!"),
+            textInput("serial_no", "New serial no", value = "Search first!"),
             textInput("recorder", label = "Observer name", value = ""),
             selectInput("make", label = "Instrument make", choices = c("", "YSI", "Solinst", "HOBO/Onset", "OTT", "RBR", "Campbell Sci", "In-Situ", "Other"), ),
             textInput("model", label = "Instrument model", value = ""),
@@ -54,7 +54,7 @@ app_ui <- function(request) {
             dateInput("date_purchased", label = "Date purchased"),
             dateInput("date_retired", label = "Date retired"),
             textInput("retired_by", label = "Retired by", value = ""),
-            actionButton("save_cal_instrument", "Save this sheet")
+            actionButton("save_cal_instrument", "Save new instrument")
           ),
           conditionalPanel(
             # On initial load, this page will only show the selectInput box. Once an instrument is selected, instrument details will be listed in the mainPanel and sensors will appear in the sidePanel. Each sensor will appear as an actionButton, and clicking that actionButton will load its details in the mainPanel. Once that happens, the sidebarPanel will change to show actionButtons to "Change" or "Maintain" the sensor.
@@ -90,11 +90,10 @@ app_ui <- function(request) {
             conditionalPanel(
               condition = "input.selection == 'Basic calibration info'",
               textInput("observer", label = "Calibrator name", value = ""),
-              dateInput("obs_date", label = "Calibration date"),
-              shinyTime::timeInput("obs_time", label = "Calibration time MST", value = .POSIXct(Sys.time(), tz = "MST"), seconds = FALSE, minute.steps = 30),
+              shinyWidgets::airDatepickerInput("obs_datetime", label = "Calibration date/time", value = .POSIXct(Sys.time(), tz = "MST"), range = FALSE, multiple = FALSE, timepicker = TRUE, maxDate = Sys.Date()+1, startView = Sys.Date(), update_on = "close", timepickerOpts = shinyWidgets::timepickerOptions(minutesStep = 15)),
               textOutput("instrument_reminder"),
-              selectInput("ID_sensor_holder", label = "Logger/bulkhead/sonde serial #", choices = ""),
-              selectInput("ID_handheld_meter", label = "Handheld serial # (if applicable)", choices = "NA"),
+              selectizeInput("ID_sensor_holder", label = "Logger/bulkhead/sonde serial #", choices = ""),
+              selectizeInput("ID_handheld_meter", label = "Handheld serial # (if applicable)", choices = "NA"),
               actionButton("save_basic_info", "Save this sheet")
             )
           ),
@@ -216,7 +215,7 @@ app_ui <- function(request) {
           ),
           conditionalPanel(
             condition = "input.first_selection == 'Manage instruments'",
-            textOutput("manage_text")
+            DT::dataTableOutput("manage_instruments_table")
           ),
           conditionalPanel(
             condition = "input.first_selection == 'Manage sensors and log maintenance'",

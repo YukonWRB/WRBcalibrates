@@ -20,7 +20,7 @@ Imports:
     shiny,
     shinyalert,
     shinyjs,
-    shinyTime
+    shinyWidgets
 Suggests: 
     spelling,
     testthat (>= 3.0.0)
