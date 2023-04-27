@@ -83,9 +83,6 @@ app_server <- function(input, output, session) {
     sensors_data$sensor1_details
   })
 
-  instruments_data$manage_instruments <- data.frame("Loading..." = NA, check.names = FALSE)
-  output$manage_instruments_table <- DT::renderDataTable(instruments_data$manage_instruments, rownames = FALSE)
-
   output$instrument_reminder <- renderText({
     messages$instrument_reminder
   })
@@ -157,26 +154,79 @@ app_server <- function(input, output, session) {
     updateRadioButtons(session, inputId = "depth_changes_ok", selected = "FALSE")
   }
 
-  #Authenticate and fetch from Google
-  googlesheets4::gs4_auth(cache = ".secrets", email = TRUE, use_oob = TRUE) #Run after the above two lines are run once.
-  googledrive::drive_auth(cache = ".secrets", email = TRUE, use_oob = TRUE) #Run after the above two lines are run once.
-  calibrations_id <- googledrive::drive_get("calibrations/calibrations")$id
-  instruments_id <- googledrive::drive_get("calibrations/instruments")$id
-  sensors_id <- googledrive::drive_get("calibrations/sensors")$id
-  instruments_sheet <- googlesheets4::read_sheet(instruments_id, sheet = "instruments")
-  instruments_sheet <- as.data.frame(instruments_sheet)
+  #Authenticate and fetch from Google. While loop is in case it's too slow or yields a connection error, which happens sometimes.
+  max_retries <- 5
+  retry_count <- 0
+  alert_shown <- FALSE
+  while (retry_count < max_retries){
+    tryCatch({
+      # googlesheets4::gs4_auth(cache = ".secrets") #Run locally FIRST TIME ONLY to allow the email to work
+      # googledrive::drive_auth(cache = ".secrets") #Run locally FIRST TIME ONLY to allow the email to work
+      googlesheets4::gs4_auth(cache = ".secrets", email = TRUE, use_oob = TRUE) #Run after the above two lines are run once.
+      googledrive::drive_auth(cache = ".secrets", email = TRUE, use_oob = TRUE) #Run after the above two lines are run once.
+
+      #Saved code to allow only one editing user at a time. Currently worked by limiting shinyapps.io to a single instance at a time.
+      # users_id <- googledrive::drive_get("calibrations/users")$id
+      # users <- googlesheets4::read_sheet(users_id, sheet = "users")
+      # users <- as.data.frame(users)
+      # if (users[nrow(users), "open"] == TRUE){
+      #   #check the start_time. More than a half hour ago? Probably from a crashed instance.
+      #
+      # } else { #lock things down until finished
+      #   con_num <- users[nrow(users), "con_num"] + 1
+      #   googlesheets4::sheet_append(users_id,
+      #                               data = data.frame("con_num" = con_num,
+      #                                                             "start_time" = as.character(.POSIXct(Sys.time(), tz = "MST")),
+      #                                                             "open" = TRUE),
+      #                               sheet = "users")
+      #   onStop({
+      #     googlesheets4::range_write(users_id, data = data.frame("open" = FALSE), sheet = "users", range = paste0("C", nrow(users) +2), col_names = FALSE)
+      #   })
+      # }
+
+
+      # calibrations_id <- googledrive::drive_get("calibrations/calibrations")$id #not necessary unless/until the id changes (a bit slow)
+      calibrations_id <- "1X-5-wJRM5Q5QRBya88Pia2YW7tiVwggozQMWHzpCIZQ"
+      # instruments_id <- googledrive::drive_get("calibrations/instruments")$id #not necessary unless/until the id changes
+      instruments_id <- "16OSB9PJnRzuiizBnH-I1QcXXMlIdE0D1v5pb5JnmTNE"
+      # sensors_id <- googledrive::drive_get("calibrations/sensors")$id #not necessary unless/until the id changes
+      sensors_id <- "15olKuoTKhDvEMzgkNAlMDLdF1DnJn0pQBX6CuArY-ls"
+      instruments_sheet <- googlesheets4::read_sheet(instruments_id, sheet = "instruments")
+      instruments_sheet <- as.data.frame(instruments_sheet)
+      if (alert_shown){
+        shinyalert::shinyalert("Success!", immediate = true, timer = 2000)
+      }
+      break
+    }, error = function(e) {
+      alert_shown <- TRUE
+      shinyalert::shinyalert("Connection difficulties...", paste0("Attempt ", retry_count+1, " of ", max_retries), type = "error", immediate = TRUE)
+      retry_count <<- retry_count + 1
+      Sys.sleep(2)
+    })
+  }
+  if (retry_count == max_retries){
+    shinyalert::shinyalert("Failed to connect to remote data", "Try again in a few minutes.", type = "error")
+    Sys.sleep(3)
+    stopApp()
+  }
+
   instruments_data$sheet <- instruments_sheet #assign to a reactive
   instruments_data$handhelds <- instruments_sheet[instruments_sheet$type == "Handheld (connects to bulkheads)" & is.na(instruments_sheet$date_retired) , ]
   instruments_data$others <- instruments_sheet[instruments_sheet$type != "Handheld (connects to bulkheads)" & is.na(instruments_sheet$date_retired) , ]
-  instruments_data$maintainable <- instruments_sheet[instruments_sheet$type %in% c("Sonde (multi-param deployable, interchangeable sensors)", "Bulkhead (requires handheld, not deployable)", "Logger (single/multi-param deployable, fixed sensors)") , ]
+  instruments_data$maintainable <- instruments_sheet[instruments_sheet$type %in% c("Sonde (multi-param deployable, interchangeable sensors)", "Bulkhead (requires handheld, not deployable)") , ]
 
-  # query the observations sheet for increment number and unfinished calibrations
-  observations <- googlesheets4::read_sheet(calibrations_id, sheet = "observations")
-  observations <- as.data.frame(observations)
-  calibration_data$next_id <- max(observations$observation_ID) + 1  # find out the new observation ID number
+  initial_manage_instruments_table <- instruments_sheet[ , !colnames(instruments_sheet) %in% c("instrument_ID", "observer", "obs_datetime")]
+  initial_manage_instruments_table$type <- gsub(" .*", "", initial_manage_instruments_table$type)
+  output$manage_instruments_table <- DT::renderDataTable(initial_manage_instruments_table, rownames = FALSE)
+  output$calibration_instruments_table <- DT::renderDataTable(initial_manage_instruments_table, rownames = FALSE, selection = "single")
 
-  #Update some input fields for the first page (when nothing is selected yet)
-  observeEvent(instruments_data$others, {
+  #TODO: lines below persist in not working.
+  # updateSelectizeInput(session, "ID_sensor_holder", choices = c("", instruments_sheet[instruments_sheet$type != "Handheld (connects to bulkheads)" & is.na(instruments_sheet$date_retired) , "serial_no"]))
+  # updateSelectizeInput(session, "ID_handheld_meter", choices = c("NA", instruments_sheet[instruments_sheet$type == "Handheld (connects to bulkheads)" & is.na(instruments_sheet$date_retired) , "serial_no"]))
+
+
+  #Update some input fields for the first page (when nothing is selected yet) Work-around for the lines above.
+  observeEvent(input$obs_datetime, {
     updateSelectizeInput(session, "ID_sensor_holder", choices = c("", instruments_data$others$serial_no))
     updateSelectizeInput(session, "ID_handheld_meter", choices = c("NA", instruments_data$handhelds$serial_no))
   })
@@ -184,6 +234,15 @@ app_server <- function(input, output, session) {
     updateSelectizeInput(session, "ID_sensor_holder", choices = c("", instruments_data$others$serial_no))
     updateSelectizeInput(session, "ID_handheld_meter", choices = c("NA", instruments_data$handhelds$serial_no))
   })
+  observeEvent(input$calibration_instruments_table_cell_clicked, {
+    updateSelectizeInput(session, "ID_sensor_holder", choices = c("", instruments_data$others$serial_no))
+    updateSelectizeInput(session, "ID_handheld_meter", choices = c("NA", instruments_data$handhelds$serial_no))
+  })
+
+  # query the observations sheet for increment number and unfinished calibrations
+  observations <- googlesheets4::read_sheet(calibrations_id, sheet = "observations")
+  observations <- as.data.frame(observations)
+  calibration_data$next_id <- max(observations$observation_ID) + 1  # find out the new observation ID number
 
   # find out if any calibrations are labelled as incomplete
   incomplete_observations <- observations[observations$complete == FALSE,]
@@ -271,6 +330,7 @@ app_server <- function(input, output, session) {
         sensors_data$sensors <- sensors_sheet #assign to a reactive
       }
     } else if (input$first_selection == "Calibrate"){
+      shinyjs::show("calibration_instruments_table")
       shinyjs::show("submit_btn")
       shinyjs::hide("load_sensors")
       shinyjs::hide("sensor1_show")
@@ -1400,6 +1460,17 @@ app_server <- function(input, output, session) {
     })
   })
 
+  observeEvent(input$selection, {
+    if (input$selection == "Basic calibration info"){
+      instruments_data$manage_instruments <- instruments_data$sheet[ , !colnames(instruments_data$sheet) %in% c("instrument_ID", "observer", "obs_datetime")]
+      instruments_data$manage_instruments$type <- gsub(" .*", "", instruments_data$manage_instruments$type)
+      output$calibration_instruments_table <- DT::renderDataTable(instruments_data$manage_instruments, rownames = FALSE)
+      shinyjs::show("calibration_instruments_table")
+    } else {
+      shinyjs::hide("calibration_instruments_table")
+    }
+  })
+
   ### Save basic info
   observeEvent(input$save_basic_info, {
     #Check length of observer, sensor holder, handheld holder
@@ -1413,7 +1484,7 @@ app_server <- function(input, output, session) {
       shinyalert::shinyalert(title = "Fill in the logger/bulkhead serial #", type = "error", timer = 2000)
     }
     if (input$ID_handheld_meter == "NA"){
-      shinyalert::shinyalert(title = "Warning: no handheld specified", text = "Handheld only necessary with handheld/bulkhead combos; sondes and loggers are self-contain for calibrations.", type = "warning")
+      shinyalert::shinyalert(title = "Warning: no handheld specified", text = "Handheld only necessary with handheld/bulkhead combos; sondes and loggers are self-contained for calibrations.", type = "warning")
     }
 
     if (validation_check$basic){

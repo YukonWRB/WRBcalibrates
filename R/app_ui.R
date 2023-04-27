@@ -206,6 +206,7 @@ app_ui <- function(request) {
         mainPanel(
           conditionalPanel(
             condition = "input.first_selection == 'Calibrate'",
+            DT::dataTableOutput("calibration_instruments_table"),
             tableOutput("restart_table"),
             tableOutput("saved")
           ),
