@@ -1,4 +1,4 @@
-#' The#' The application server-side
+#' The application server-side
 #'
 #' @param input,output,session Internal parameters for {shiny}.
 #'     DO NOT REMOVE.
@@ -7,6 +7,66 @@
 app_server <- function(input, output, session) {
 
   shinyalert::shinyalert("Loading data...", type = "info", timer = 4000)
+
+  #Authenticate and fetch from Google. While loop is in case it's too slow or yields a connection error, which happens sometimes.
+  max_retries <- 5
+  retry_count <- 0
+  alert_shown <- FALSE
+  while (retry_count < max_retries){
+    tryCatch({
+      # googlesheets4::gs4_auth(cache = ".secrets") #Run locally FIRST TIME ONLY to allow the email to work
+      # googledrive::drive_auth(cache = ".secrets") #Run locally FIRST TIME ONLY to allow the email to work
+      googlesheets4::gs4_auth(cache = ".secrets", email = TRUE, use_oob = TRUE) #Run after the above two lines are run once.
+      # googledrive::drive_auth(cache = ".secrets", email = TRUE, use_oob = TRUE) #Run after the above two lines are run once. Not necessary unless googledrive is used to retrieve the workbook id
+
+      # # Saved code to allow only one editing user at a time.
+      # # users_id <- googledrive::drive_get("calibrations/users")$id #not necessary unless/until the id changes (a bit slow)
+      # users_id <- "1MTKlsN0G9Sembf6R1ICDS1UmwOe6hvVbHT_kPh5b7oA"
+      # users <- googlesheets4::read_sheet(users_id, sheet = "users")
+      # users <- as.data.frame(users)
+      # if (users[nrow(users), "open"] == TRUE){
+      #   #check the start_time. More than a half hour ago? Probably from a crashed instance.
+      #
+      # } else { #lock things down until finished
+      #   googlesheets4::sheet_append(users_id,
+      #                               data = data.frame("con_num" = users[nrow(users), "con_num"] + 1,
+      #                                                             "start_time" = as.character(.POSIXct(Sys.time(), tz = "MST")),
+      #                                                             "open" = TRUE),
+      #                               sheet = "users")
+      #   onStop(function(){
+      #     googlesheets4::range_write(users_id, data = data.frame("open" = FALSE), sheet = "users", range = paste0("C", nrow(users) +2), col_names = FALSE)
+      #     Sys.sleep(5)
+      #     cat("onStop ran")
+      #   })
+      # }
+
+
+      # calibrations_id <- googledrive::drive_get("calibrations/calibrations")$id #not necessary unless/until the id changes (a bit slow)
+      calibrations_id <- "1X-5-wJRM5Q5QRBya88Pia2YW7tiVwggozQMWHzpCIZQ"
+      # instruments_id <- googledrive::drive_get("calibrations/instruments")$id #not necessary unless/until the id changes
+      instruments_id <- "16OSB9PJnRzuiizBnH-I1QcXXMlIdE0D1v5pb5JnmTNE"
+      # sensors_id <- googledrive::drive_get("calibrations/sensors")$id #not necessary unless/until the id changes
+      sensors_id <- "15olKuoTKhDvEMzgkNAlMDLdF1DnJn0pQBX6CuArY-ls"
+      instruments_sheet <- googlesheets4::read_sheet(instruments_id, sheet = "instruments")
+      instruments_sheet <- as.data.frame(instruments_sheet)
+      if (alert_shown){
+        shinyalert::shinyalert("Success!", immediate = true, timer = 2000)
+      }
+      break
+    }, error = function(e) {
+      alert_shown <- TRUE
+      shinyalert::shinyalert("Connection difficulties...", paste0("Attempt ", retry_count+1, " of ", max_retries), type = "error", immediate = TRUE)
+      retry_count <<- retry_count + 1
+      Sys.sleep(2)
+    })
+  }
+  if (retry_count == max_retries){
+    shinyalert::shinyalert("Failed to connect to remote data", "Try again in a few minutes.", type = "error")
+    Sys.sleep(3)
+    stopApp()
+  }
+
+
 
   # create a few containers
   validation_check <- reactiveValues()
@@ -154,61 +214,7 @@ app_server <- function(input, output, session) {
     updateRadioButtons(session, inputId = "depth_changes_ok", selected = "FALSE")
   }
 
-  #Authenticate and fetch from Google. While loop is in case it's too slow or yields a connection error, which happens sometimes.
-  max_retries <- 5
-  retry_count <- 0
-  alert_shown <- FALSE
-  while (retry_count < max_retries){
-    tryCatch({
-      # googlesheets4::gs4_auth(cache = ".secrets") #Run locally FIRST TIME ONLY to allow the email to work
-      # googledrive::drive_auth(cache = ".secrets") #Run locally FIRST TIME ONLY to allow the email to work
-      googlesheets4::gs4_auth(cache = ".secrets", email = TRUE, use_oob = TRUE) #Run after the above two lines are run once.
-      googledrive::drive_auth(cache = ".secrets", email = TRUE, use_oob = TRUE) #Run after the above two lines are run once.
 
-      #Saved code to allow only one editing user at a time. Currently worked by limiting shinyapps.io to a single instance at a time.
-      # users_id <- googledrive::drive_get("calibrations/users")$id
-      # users <- googlesheets4::read_sheet(users_id, sheet = "users")
-      # users <- as.data.frame(users)
-      # if (users[nrow(users), "open"] == TRUE){
-      #   #check the start_time. More than a half hour ago? Probably from a crashed instance.
-      #
-      # } else { #lock things down until finished
-      #   con_num <- users[nrow(users), "con_num"] + 1
-      #   googlesheets4::sheet_append(users_id,
-      #                               data = data.frame("con_num" = con_num,
-      #                                                             "start_time" = as.character(.POSIXct(Sys.time(), tz = "MST")),
-      #                                                             "open" = TRUE),
-      #                               sheet = "users")
-      #   onStop({
-      #     googlesheets4::range_write(users_id, data = data.frame("open" = FALSE), sheet = "users", range = paste0("C", nrow(users) +2), col_names = FALSE)
-      #   })
-      # }
-
-
-      # calibrations_id <- googledrive::drive_get("calibrations/calibrations")$id #not necessary unless/until the id changes (a bit slow)
-      calibrations_id <- "1X-5-wJRM5Q5QRBya88Pia2YW7tiVwggozQMWHzpCIZQ"
-      # instruments_id <- googledrive::drive_get("calibrations/instruments")$id #not necessary unless/until the id changes
-      instruments_id <- "16OSB9PJnRzuiizBnH-I1QcXXMlIdE0D1v5pb5JnmTNE"
-      # sensors_id <- googledrive::drive_get("calibrations/sensors")$id #not necessary unless/until the id changes
-      sensors_id <- "15olKuoTKhDvEMzgkNAlMDLdF1DnJn0pQBX6CuArY-ls"
-      instruments_sheet <- googlesheets4::read_sheet(instruments_id, sheet = "instruments")
-      instruments_sheet <- as.data.frame(instruments_sheet)
-      if (alert_shown){
-        shinyalert::shinyalert("Success!", immediate = true, timer = 2000)
-      }
-      break
-    }, error = function(e) {
-      alert_shown <- TRUE
-      shinyalert::shinyalert("Connection difficulties...", paste0("Attempt ", retry_count+1, " of ", max_retries), type = "error", immediate = TRUE)
-      retry_count <<- retry_count + 1
-      Sys.sleep(2)
-    })
-  }
-  if (retry_count == max_retries){
-    shinyalert::shinyalert("Failed to connect to remote data", "Try again in a few minutes.", type = "error")
-    Sys.sleep(3)
-    stopApp()
-  }
 
   instruments_data$sheet <- instruments_sheet #assign to a reactive
   instruments_data$handhelds <- instruments_sheet[instruments_sheet$type == "Handheld (connects to bulkheads)" & is.na(instruments_sheet$date_retired) , ]
@@ -219,10 +225,6 @@ app_server <- function(input, output, session) {
   initial_manage_instruments_table$type <- gsub(" .*", "", initial_manage_instruments_table$type)
   output$manage_instruments_table <- DT::renderDataTable(initial_manage_instruments_table, rownames = FALSE)
   output$calibration_instruments_table <- DT::renderDataTable(initial_manage_instruments_table, rownames = FALSE, selection = "single")
-
-  #TODO: lines below persist in not working.
-  # updateSelectizeInput(session, "ID_sensor_holder", choices = c("", instruments_sheet[instruments_sheet$type != "Handheld (connects to bulkheads)" & is.na(instruments_sheet$date_retired) , "serial_no"]))
-  # updateSelectizeInput(session, "ID_handheld_meter", choices = c("NA", instruments_sheet[instruments_sheet$type == "Handheld (connects to bulkheads)" & is.na(instruments_sheet$date_retired) , "serial_no"]))
 
 
   #Update some input fields for the first page (when nothing is selected yet) Work-around for the lines above.
@@ -2080,7 +2082,7 @@ app_server <- function(input, output, session) {
                                if (x) {# Mark it as complete == TRUE. Read in observations again as the sheet now has a new row or a row that is being edited from incomplete calibration.
                                  observations <- googlesheets4::read_sheet(calibrations_id, sheet = "observations")
                                  observations <- as.data.frame(observations)
-                                 googlesheets4::range_write(calibrations_id, data = data.frame(complete = TRUE), sheet = "observations", range = paste0("G", which(observations$observation_ID == calibration_data$next_id)+1), col_names = FALSE, reformat = FALSE)
+                                 googlesheets4::range_write(calibrations_id, data = data.frame(complete = TRUE), sheet = "observations", range = paste0("F", which(observations$observation_ID == calibration_data$next_id)+1), col_names = FALSE, reformat = FALSE)
                                  shinyalert::shinyalert(title = paste0("Calibration finalized."),
                                                         type = "success", immediate = TRUE)
                                  #Reset fields
@@ -2092,6 +2094,16 @@ app_server <- function(input, output, session) {
                                  reset_turb()
                                  reset_do()
                                  reset_depth()
+                                 #Reset tables
+                                 # remake df from scratch
+                                 send_table$saved <- data.frame("Saved calibrations" = "Nothing saved yet", check.names = FALSE) #Title is modified later for clarity if user want to restart a cal
+                                 send_table$restarted_cal <- data.frame("Saved calibrations (recovered session)" = "Basic info", check.names = FALSE)
+                                 output$saved <- renderTable({ # Display local calibrations table
+                                   send_table$saved
+                                 })
+                                 output$restart_table <- renderTable({ # Display remotely saved calibrations tables
+                                   send_table$restarted_cal
+                                 })
                                  #Get the next ID in case user is calibrating/working in app again
                                  calibration_data$next_id <- max(observations$observation_ID) + 1
                                }
