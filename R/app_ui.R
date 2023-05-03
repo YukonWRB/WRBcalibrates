@@ -165,9 +165,10 @@ app_ui <- function(request) {
             conditionalPanel(
               condition = "input.selection == 'Conductivity calibration'",
               numericInput("SpC1_std", label = "SpC Low-Range Standard", value = "0"),
+              numericInput("SpC2_std", label = "SpC High-Range Standard", value = "1413"),
+              checkboxInput("spc_or_not", "Enter non-specific conducvitity instead?", value = FALSE),
               numericInput("SpC1_pre", label = "SpC Low-Range Pre-Cal Value", value = ""),
               numericInput("SpC1_post", label = "SpC Low-Range Post-Cal Value", value = ""),
-              numericInput("SpC2_std", label = "SpC High-Range Standard", value = "1413"),
               numericInput("SpC2_pre", label = "SpC High-Range Pre-Cal Value", value = ""),
               numericInput("SpC2_post", label = "SpC High-Range Post-Cal Value", value = ""),
               actionButton("validate_SpC", "Validate measurements"),

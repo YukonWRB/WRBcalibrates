@@ -75,7 +75,6 @@ app_server <- function(input, output, session) {
   restarted <- reactiveValues()
   restarted$restarted <- FALSE
   instruments_data <- reactiveValues()
-  instruments_data$others <- NULL
   sensors_data <- reactiveValues()
   sensors_data$datetime <- as.character(.POSIXct(Sys.time(), tz = "MST")) #get the time here so that multiple maintenance events are on same line
   send_table <- reactiveValues()
@@ -89,6 +88,7 @@ app_server <- function(input, output, session) {
   complete$turbidity <- FALSE
   complete$DO <- FALSE
   complete$depth <- FALSE
+  reset_check <- reactiveValues(sensors = FALSE)
 
   # Hide a bunch of buttons until they can be used
   # Delete buttons to remove a calibration sheet
@@ -127,6 +127,7 @@ app_server <- function(input, output, session) {
   shinyjs::hide("add_comment")
   shinyjs::hide("add.change_sensor.comment_name")
   shinyjs::hide("add.change_sensor.comment")
+  shinyjs::hide("restart_table")
 
   #message for the instrument management table
 
@@ -135,7 +136,7 @@ app_server <- function(input, output, session) {
 
   # Initiate data.frame to populate with saved calibrations later
   send_table$saved <- data.frame("Saved calibrations" = "Nothing saved yet", check.names = FALSE) #Title is modified later for clarity if user want to restart a cal
-  send_table$restarted_cal <- data.frame("Saved calibrations (recovered session)" = "Basic info", check.names = FALSE)
+  send_table$restarted_cal <- data.frame("Saved calibrations (recovered session)" = "", check.names = FALSE)
   # Initiate data.frame for instrument details when maintaining
   sensors_data$instrument_table <- data.frame("Select an instrument first" = NA, check.names = FALSE)
   sensors_data$sensor1_details <- data.frame("Nothing to show yet!" = NA, check.names = FALSE)
@@ -154,11 +155,13 @@ app_server <- function(input, output, session) {
   })
 
   #Create the reset functions
-  reset_basic <- function(){
-    updateTextInput(session, "observer", label = "Calibrator name", value = "")
-    shinyWidgets::updateAirDateInput(session, "obs_datetime", value = .POSIXct(Sys.time(), tz = "MST"))
-    updateSelectizeInput(session, "ID_sensor_holder", choices = c("", instruments_data$others$serial_no))
-    updateSelectizeInput(session, "ID_handheld_meter", choices = c("NA", instruments_data$handhelds$serial_no))
+  reset_basic <- function(keep_observer = FALSE){
+    if (!keep_observer){
+      updateTextInput(session, "observer", label = "Calibrator name", value = "")
+    }
+    shinyWidgets::updateAirDateInput(session, "obs_datetime", value = as.character(.POSIXct(Sys.time(), tz = "MST")))
+    updateSelectizeInput(session, "ID_sensor_holder", selected = "")
+    updateSelectizeInput(session, "ID_handheld_meter", selected = "NA")
   }
   reset_ph <- function(){
     updateNumericInput(session, "pH1_std", label = "Low pH solution value", value = "4")
@@ -176,16 +179,19 @@ app_server <- function(input, output, session) {
     updateNumericInput(session, "pH2_post_mV", label = "pH 7 Post-Cal mV", value = "")
     updateNumericInput(session, "pH3_post_val", label = "pH 10 Post-Cal Value", value = "")
     updateNumericInput(session, "pH3_post_mV", label = "pH 10 Post-Cal mV", value = "")
+    shinyjs::hide("delete_pH")
   }
   reset_temp <- function(){
     updateTextInput(session, "temp_reference_desc", label = "Temp Reference Type", value = "Lab thermometer")
     updateNumericInput(session, "temp_reference", label = "Reference Temp", value = "")
     updateNumericInput(session, "temp_observed", label = "Sensor Temp", value = "")
+    shinyjs::hide("delete_temp")
   }
   reset_orp <- function(){
     updateNumericInput(session, "orp_std", label = "ORP Standard solution mV", value = "")
     updateNumericInput(session, "orp_pre_mV", label = "ORP mV Pre-Cal Value", value = "")
     updateNumericInput(session, "orp_post_mV", label = "ORP mV Post-Cal Value", value = "")
+    shinyjs::hide("delete_orp")
   }
   reset_spc <- function(){
     updateNumericInput(session, "SpC1_std", label = "SpC Low-Range Standard", value = "0")
@@ -194,6 +200,7 @@ app_server <- function(input, output, session) {
     updateNumericInput(session, "SpC2_std", label = "SpC High-Range Standard", value = "1413")
     updateNumericInput(session, "SpC2_pre", label = "SpC High-Range Pre-Cal Value", value = "")
     updateNumericInput(session, "SpC2_post", label = "SpC High-Range Post-Cal Value", value = "")
+    shinyjs::hide("delete_SpC")
   }
   reset_turb <- function(){
     updateNumericInput(session, "turb1_std", label = "Low Turb Standard Value", value = "0")
@@ -202,18 +209,20 @@ app_server <- function(input, output, session) {
     updateNumericInput(session, "turb2_pre", label = "High Turb Pre-cal Value", value = "")
     updateNumericInput(session, "turb1_post", label = "Low Turb Post-cal Value", value = "")
     updateNumericInput(session, "turb2_post", label = "High Turb Post-cal Value", value = "")
+    shinyjs::hide("delete_turb")
   }
   reset_do <- function(){
     updateNumericInput(session, "baro_press_pre", label = "Baro Pressure Pre-Cal", value = "")
     updateNumericInput(session, "baro_press_post", label = "Baro Pressure Post-Cal", value = "")
     updateNumericInput(session, "DO_pre", label = "DO Pre-Cal mg/L", value = "")
     updateNumericInput(session, "DO_post", label = "DO Post-Cal mg/L", value = "")
+    shinyjs::hide("delete_DO")
   }
   reset_depth <- function(){
     updateRadioButtons(session, inputId = "depth_check_ok", selected = "FALSE")
     updateRadioButtons(session, inputId = "depth_changes_ok", selected = "FALSE")
+    shinyjs::hide("delete_depth")
   }
-
 
 
   instruments_data$sheet <- instruments_sheet #assign to a reactive
@@ -226,19 +235,21 @@ app_server <- function(input, output, session) {
   output$manage_instruments_table <- DT::renderDataTable(initial_manage_instruments_table, rownames = FALSE)
   output$calibration_instruments_table <- DT::renderDataTable(initial_manage_instruments_table, rownames = FALSE, selection = "single")
 
-
+  #TODO: these updates should be taken care of at start when input$first_selection == "Calibrate" is triggered upon start (it's the landing page)
   #Update some input fields for the first page (when nothing is selected yet) Work-around for the lines above.
   observeEvent(input$obs_datetime, {
-    updateSelectizeInput(session, "ID_sensor_holder", choices = c("", instruments_data$others$serial_no))
-    updateSelectizeInput(session, "ID_handheld_meter", choices = c("NA", instruments_data$handhelds$serial_no))
+      updateSelectizeInput(session, "ID_sensor_holder", choices = c("", instruments_data$others$serial_no))
+      updateSelectizeInput(session, "ID_handheld_meter", choices = c("NA", instruments_data$handhelds$serial_no))
   })
   observeEvent(input$observer, {
-    updateSelectizeInput(session, "ID_sensor_holder", choices = c("", instruments_data$others$serial_no))
-    updateSelectizeInput(session, "ID_handheld_meter", choices = c("NA", instruments_data$handhelds$serial_no))
+      updateSelectizeInput(session, "ID_sensor_holder", choices = c("", instruments_data$others$serial_no))
+      updateSelectizeInput(session, "ID_handheld_meter", choices = c("NA", instruments_data$handhelds$serial_no))
+
   })
   observeEvent(input$calibration_instruments_table_cell_clicked, {
-    updateSelectizeInput(session, "ID_sensor_holder", choices = c("", instruments_data$others$serial_no))
-    updateSelectizeInput(session, "ID_handheld_meter", choices = c("NA", instruments_data$handhelds$serial_no))
+      updateSelectizeInput(session, "ID_sensor_holder", choices = c("", instruments_data$others$serial_no))
+      updateSelectizeInput(session, "ID_handheld_meter", choices = c("NA", instruments_data$handhelds$serial_no))
+
   })
 
   # query the observations sheet for increment number and unfinished calibrations
@@ -257,9 +268,9 @@ app_server <- function(input, output, session) {
   } else {
     # Make a data.frame with no calibrations
     complete$incomplete <- data.frame("Index" = "0",
-                                        "Calibrator" = "No unsaved calibrations!",
-                                        "Date/Time" = "No unsaved calibrations!",
-                                        check.names = FALSE)
+                                      "Calibrator" = "No unsaved calibrations!",
+                                      "Date/Time" = "No unsaved calibrations!",
+                                      check.names = FALSE)
   }
 
   observeEvent(input$pH1_std, {
@@ -282,7 +293,7 @@ app_server <- function(input, output, session) {
   })
 
   #observeEvents for when the user selects a particular page
-  observeEvent(input$first_selection, { #update selections to incorporate the new record
+  observeEvent(input$first_selection, {
     if (input$first_selection == "Manage instruments"){
       shinyjs::hide("submit_btn")
       shinyjs::hide("load_sensors")
@@ -361,8 +372,6 @@ app_server <- function(input, output, session) {
       shinyjs::hide("add_comment")
       shinyjs::hide("add.change_sensor.comment_name")
       shinyjs::hide("add.change_sensor.comment")
-      updateSelectizeInput(session, "ID_sensor_holder", choices = c("", instruments_data$others$serial_no))
-      updateSelectizeInput(session, "ID_handheld_meter", choices = c("NA", instruments_data$handhelds$serial_no))
     } else if (input$first_selection == "View unfinished calibrations"){
       output$incomplete_table <- DT::renderDataTable(complete$incomplete, rownames = FALSE)
       shinyjs::hide("submit_btn")
@@ -1062,6 +1071,8 @@ app_server <- function(input, output, session) {
     instruments_data$handhelds <- instruments_sheet[instruments_sheet$type == "Handheld (connects to bulkheads)" & is.na(instruments_sheet$date_retired) , ]
     instruments_data$others <- instruments_sheet[instruments_sheet$type != "Handheld (connects to bulkheads)" & is.na(instruments_sheet$date_retired) , ]
     updateSelectInput(session, "existing_serial_no", choices = c("New record", instruments_data$sheet$serial_no))
+    updateSelectizeInput(session, "ID_sensor_holder", choices = c("", instruments_data$others$serial_no))
+    updateSelectizeInput(session, "ID_handheld_meter", choices = c("NA", instruments_data$handhelds$serial_no))
   })
 
   observeEvent(input$restart_calibration, {
@@ -1069,16 +1080,13 @@ app_server <- function(input, output, session) {
     if (restart_value == 0){
       shinyalert::shinyalert("0 is not a valid selection!", type = "error")
     } else {
+      shinyjs::show("restart_table")
       send_table$restarted_cal <- data.frame("Saved calibrations (recovered session)" = "Basic info", check.names = FALSE) #Set/reset here for if the user selects a different calibration in the same session
       complete$basic <- TRUE
       shinyalert::shinyalert("Loading old calibration", text = "Please wait to be taken to the calibration section", type = "info", timer = 5000)
       incomplete_ID <- as.numeric(incomplete_observations[restart_value , 1])
       calibration_data$next_id <- incomplete_ID
       calibration_data$restarted_id <- incomplete_ID
-      # Reset the basic fields according to recovered info
-      shinyWidgets::updateAirDateInput(session, "obs_datetime", value = incomplete_observations[restart_value, "obs_datetime"])
-      updateSelectizeInput(session, "ID_sensor_holder", selected = incomplete_observations[restart_value , "ID_sensor_holder"])
-      updateSelectizeInput(session, "ID_handheld_meter", selected = incomplete_observations[restart_value , "ID_handheld_meter"])
 
       # Search for entries in parameter-specific sheets with the same observation_ID and update the fields
       calibration_sheets <- googlesheets4::sheet_names(calibrations_id)
@@ -1159,6 +1167,11 @@ app_server <- function(input, output, session) {
         }
       }
       updateSelectInput(session, "first_selection", selected = "Calibrate") #Changing this selection brings the user right to the calibration page
+      # Reset the basic fields according to recovered info
+      updateTextInput(session, "observer", value = incomplete_observations[restart_value, "observer"])
+      shinyWidgets::updateAirDateInput(session, "obs_datetime", value = incomplete_observations[restart_value, "obs_datetime"])
+      updateSelectizeInput(session, "ID_sensor_holder", choices = instruments_data$others$serial_no, selected = incomplete_observations[restart_value , "ID_sensor_holder"])
+      updateSelectizeInput(session, "ID_handheld_meter", choices  = c("NA", instruments_data$handhelds$serial_no), selected = incomplete_observations[restart_value , "ID_handheld_meter"])
       colnames(send_table$saved) <- "Saved calibrations (this session)" #Update the name for clarity since we're restarting a calibration
       output$saved <- renderTable({ # Display local calibrations tables with new name
         send_table$saved
@@ -1167,6 +1180,7 @@ app_server <- function(input, output, session) {
         send_table$restarted_cal
       })
       restarted$restarted <- TRUE
+      updateCheckboxInput(session, "spc_or_not", value = FALSE) #Reset to FALSE since values are stored as SpC; this makes it clear to the user.
     }
   })
 
@@ -1175,7 +1189,6 @@ app_server <- function(input, output, session) {
     if (delete_value == 0){
       shinyalert::shinyalert("0 is not a valid selection!", type = "error")
     } else {
-
       shinyalert::shinyalert("Deleting old calibration", type = "info")
       delete_ID <- as.numeric(incomplete_observations[delete_value , 1])
       calibration_data$next_id <- delete_ID
@@ -1183,6 +1196,11 @@ app_server <- function(input, output, session) {
       for (i in calibration_sheets){
         sheet <- googlesheets4::read_sheet(calibrations_id, sheet = i)
         sheet <- as.data.frame(sheet)
+        if (i == "observations"){
+          observations <- sheet
+          observations <- observations[!observations$observation_ID == delete_value , ]
+          calibration_data$next_id <- max(observations$observation_ID) + 1
+        }
         if (nrow(sheet[sheet$observation_ID == delete_ID , ]) == 1){
           row <- which(sheet$observation_ID == calibration_data$next_id)+1
           googlesheets4::range_clear(calibrations_id, sheet = i,range = paste0(row, ":", row))
@@ -1196,7 +1214,7 @@ app_server <- function(input, output, session) {
                                           check.names = FALSE)
       }
       output$incomplete_table <- DT::renderDataTable(complete$incomplete, rownames = FALSE)
-      #reset internal markers of completness
+      #reset internal markers of completeness
       complete$basic <- FALSE
       complete$temperature <- FALSE
       complete$SpC <- FALSE
@@ -1216,7 +1234,32 @@ app_server <- function(input, output, session) {
         reset_do()
         reset_depth()
       }
+      updateNumericInput(session, "restart_index", value = 0)
       shinyalert::shinyalert("Deleted", type = "success", immediate = TRUE, timer = 2000)
+    }
+  })
+
+  observeEvent(input$spc_or_not, {
+    if (input$spc_or_not){
+      updateNumericInput(session, "SpC1_pre", label = "Conducvitity Low-Range Pre-Cal Value")
+      updateNumericInput(session, "SpC1_post", label = "Conducvitity Low-Range Post-Cal Value")
+      updateNumericInput(session, "SpC2_pre", label = "Conducvitity High-Range Pre-Cal Value")
+      updateNumericInput(session, "SpC2_post", label = "Conducvitity High-Range Post-Cal Value")
+    } else {
+      updateNumericInput(session, "SpC1_pre", label = "SpC Low-Range Pre-Cal Value")
+      updateNumericInput(session, "SpC1_post", label = "SpC Low-Range Post-Cal Value")
+      updateNumericInput(session, "SpC2_pre", label = "SpC High-Range Pre-Cal Value")
+      updateNumericInput(session, "SpC2_post", label = "SpC High-Range Post-Cal Value")
+    }
+  })
+
+  observeEvent(input$ID_sensor_holder, {
+    if (nrow(instruments_data$others[instruments_data$others$serial_no == input$ID_sensor_holder, ]) > 0){
+      if (instruments_data$others[instruments_data$others$serial_no == input$ID_sensor_holder, "make"] == "Solinst"){
+        updateCheckboxInput(session, "spc_or_not", value = TRUE)
+      } else {
+        updateCheckboxInput(session, "spc_or_not", value = FALSE)
+      }
     }
   })
 
@@ -1355,42 +1398,67 @@ app_server <- function(input, output, session) {
     })
   })
   validation_check$SpC <- FALSE
+
   observeEvent(input$validate_SpC, { #Deal with SpC
-    tryCatch({
-      SpC1_ref <- input$SpC1_std
-      SpC2_ref <- input$SpC2_std
-      SpC1_post <- input$SpC1_post
-      SpC2_post <- input$SpC2_post
-      SpC1_diff <- abs(SpC1_ref - SpC1_post)
-      SpC2_diff <- abs(SpC2_ref - SpC2_post)
-      if (SpC1_diff > 10){
-        shinyjs::js$backgroundCol("SpC1_std", "red")
-        shinyjs::js$backgroundCol("SpC1_post", "red")
-        shinyalert::shinyalert(title = "Warning: double check your values, you're way off", type = "warning", timer = 2000)
-      } else if (SpC1_diff > 5){
-        shinyjs::js$backgroundCol("SpC1_std", "lemonchiffon")
-        shinyjs::js$backgroundCol("SpC1_post", "lemonchiffon")
-        shinyalert::shinyalert(title = "Warning: double check your values, you're a bit off", type = "warning", timer = 2000)
-      } else {
-        shinyjs::js$backgroundCol("SpC1_std", "white")
-        shinyjs::js$backgroundCol("SpC1_post", "white")
-        shinyalert::shinyalert(title = "Good to go!", type = "success", timer = 2000)
-      }
-      if (SpC2_diff > 10){
-        shinyjs::js$backgroundCol("SpC2_std", "red")
-        shinyjs::js$backgroundCol("SpC2_post", "red")
-      } else if (SpC2_diff > 5){
-        shinyjs::js$backgroundCol("SpC2_std", "lemonchiffon")
-        shinyjs::js$backgroundCol("SpC2_post", "lemonchiffon")
-      } else {
-        shinyjs::js$backgroundCol("SpC2_std", "white")
-        shinyjs::js$backgroundCol("SpC2_post", "white")
-        shinyalert::shinyalert(title = "Good to go!", type = "success", timer = 2000)
-      }
-      validation_check$SpC <- TRUE
-    }, error = function(e) {
-      shinyalert::shinyalert(title = "You have unfilled mandatory entries", type = "error", timer = 2000)
-    })
+    if (input$spc_or_not & is.null(calibration_data$temp)){
+      shinyalert::shinyalert("Calibrate temperature first!", "You must calibrate temperature first if entering non-specific conductivity")
+    } else {
+      tryCatch({
+        SpC1_ref <- input$SpC1_std
+        SpC2_ref <- input$SpC2_std
+        SpC1_post <- if (input$spc_or_not) input$SpC1_post/(1+0.02*(calibration_data$temp$temp_reference - 25)) else input$SpC1_post
+        SpC2_post <- if (input$spc_or_not) input$SpC2_post/(1+0.02*(calibration_data$temp$temp_reference - 25)) else input$SpC2_post
+        SpC1_diff <- abs(SpC1_ref - SpC1_post)
+        SpC2_diff <- abs(SpC2_ref - SpC2_post)
+        gtg1 <- FALSE
+        gtg2 <- FALSE
+        if (SpC1_diff > 10){
+          shinyjs::js$backgroundCol("SpC1_std", "red")
+          shinyjs::js$backgroundCol("SpC1_post", "red")
+          if (input$spc_or_not){
+            shinyalert::shinyalert("Warning: double check your values", paste0("Your low-range input converts to an SpC of ", round(SpC1_post, 0), " versus the expected ", SpC1_ref))
+          } else {
+            shinyalert::shinyalert(title = "Warning: double check your values", type = "warning", timer = 2000)
+          }
+        } else if (SpC1_diff > 5){
+          shinyjs::js$backgroundCol("SpC1_std", "lemonchiffon")
+          shinyjs::js$backgroundCol("SpC1_post", "lemonchiffon")
+          if (input$spc_or_not){
+            shinyalert::shinyalert("Warning: double check your values", paste0("Your low_range input converts to an SpC of ", round(SpC1_post, 0), " versus the expected ", SpC1_ref))
+          } else {
+            shinyalert::shinyalert(title = "Warning: double check your values", type = "warning", timer = 2000)
+          }
+        } else {
+          gtg1 <- TRUE
+        }
+        if (SpC2_diff > 10){
+          shinyjs::js$backgroundCol("SpC2_std", "red")
+          shinyjs::js$backgroundCol("SpC2_post", "red")
+          if (input$spc_or_not){
+            shinyalert::shinyalert("Warning: double check your values", paste0("Your high-range input converts to an SpC of ", round(SpC2_post, 0), " versus the expected ", SpC2_ref))
+          } else {
+            shinyalert::shinyalert(title = "Warning: double check your values", type = "warning", timer = 2000)
+          }
+        } else if (SpC2_diff > 5){
+          shinyjs::js$backgroundCol("SpC2_std", "lemonchiffon")
+          shinyjs::js$backgroundCol("SpC2_post", "lemonchiffon")
+          shinyalert::shinyalert(title = "Warning: double check your values", type = "warning", timer = 2000)
+          if (input$spc_or_not){
+            shinyalert::shinyalert("Warning: double check your values", paste0("Your high-range input converts to an SpC of ", round(SpC2_post, 0), " versus the expected ", SpC2_ref))
+          } else {
+            shinyalert::shinyalert(title = "Warning: double check your values", type = "warning", timer = 2000)
+          }
+        } else {
+          gtg2 <- TRUE
+        }
+        if (gtg1 & gtg2){
+          shinyalert::shinyalert(title = "Good to go!", type = "success", timer = 2000)
+        }
+        validation_check$SpC <- TRUE
+      }, error = function(e) {
+        shinyalert::shinyalert(title = "You have unfilled mandatory entries", type = "error", timer = 2000)
+      })
+    }
   })
   validation_check$turb <- FALSE
   observeEvent(input$validate_turb, { #Deal with turbidity
@@ -1485,8 +1553,9 @@ app_server <- function(input, output, session) {
       validation_check$basic <- FALSE
       shinyalert::shinyalert(title = "Fill in the logger/bulkhead serial #", type = "error", timer = 2000)
     }
-    if (input$ID_handheld_meter == "NA"){
-      shinyalert::shinyalert(title = "Warning: no handheld specified", text = "Handheld only necessary with handheld/bulkhead combos; sondes and loggers are self-contained for calibrations.", type = "warning")
+    if (input$ID_handheld_meter == "NA" & instruments_data$others[instruments_data$others$serial_no == input$ID_sensor_holder, "type"] == "Bulkhead (requires handheld, not deployable)"){
+      shinyalert::shinyalert(title = "Warning: no handheld specified", text = "Handheld unit is integral to bulkhead calibrations and must be entered.", type = "error")
+      validation_check$basic <- FALSE
     }
 
     if (validation_check$basic){
@@ -1501,6 +1570,7 @@ app_server <- function(input, output, session) {
         googlesheets4::sheet_append(calibrations_id, sheet="observations", data = calibration_data$basic)
         complete$basic <- TRUE
       } else {
+
         googlesheets4::range_write(calibrations_id, data = calibration_data$basic, sheet = "observations", range = paste0("A", which(observations$observation_ID == calibration_data$next_id)+1), col_names = FALSE, reformat = FALSE)
       }
       if ("Basic info" %in% send_table$saved[ ,1] | "Basic info" %in% send_table$restarted_cal[ ,1]){
@@ -1605,7 +1675,6 @@ app_server <- function(input, output, session) {
       send_table$restarted_cal
     })
     complete$pH <- FALSE
-    shinyjs::hide("delete_pH")
   })
 
   ### Save/Delete temperature
@@ -1630,7 +1699,7 @@ app_server <- function(input, output, session) {
         if (!("Basic info" %in% send_table$saved)){
           calibration_data$basic <- data.frame(observation_ID = calibration_data$next_id,
                                                observer = "NOT SET",
-                                               obs_datetime = .POSIXct(Sys.time(), tz = "MST"),
+                                               obs_datetime = as.character(.POSIXct(Sys.time(), tz = "MST")),
                                                ID_sensor_holder = "NOT SET",
                                                ID_handheld_meter = "NOT SET",
                                                complete = FALSE)
@@ -1681,7 +1750,6 @@ app_server <- function(input, output, session) {
       send_table$restarted_cal
     })
     complete$temperature <- FALSE
-    shinyjs::hide("delete_temp")
   })
 
   ### Save/Delete ORP
@@ -1706,7 +1774,7 @@ app_server <- function(input, output, session) {
         if (!("Basic info" %in% send_table$saved)){
           calibration_data$basic <- data.frame(observation_ID = calibration_data$next_id,
                                                observer = "NOT SET",
-                                               obs_datetime = .POSIXct(Sys.time(), tz = "MST"),
+                                               obs_datetime = as.character(.POSIXct(Sys.time(), tz = "MST")),
                                                ID_sensor_holder = "NOT SET",
                                                ID_handheld_meter = "NOT SET",
                                                complete = FALSE)
@@ -1757,57 +1825,60 @@ app_server <- function(input, output, session) {
       send_table$restarted_cal
     })
     complete$orp <- FALSE
-    shinyjs::hide("delete_orp")
   })
 
   ### Save/Delete SpC
   observeEvent(input$save_cal_SpC, {
-    if (validation_check$SpC){
-      shinyalert::shinyalert(title = "Saving...", type = "info")
-      calibration_data$SpC <- data.frame(observation_ID = calibration_data$next_id,
-                                         SpC1_std = input$SpC1_std,
-                                         SpC1_pre = input$SpC1_pre,
-                                         SpC1_post = input$SpC1_post,
-                                         SpC2_std = input$SpC2_std,
-                                         SpC2_pre = input$SpC2_pre,
-                                         SpC2_post = input$SpC2_post)
-      if (!complete$SpC){
-        googlesheets4::sheet_append(calibrations_id, sheet="SpC", data = calibration_data$SpC)
-        complete$SpC <- TRUE
-        shinyjs::show("delete_SpC")
-      } else {
-        SpC_sheet <- googlesheets4::read_sheet(calibrations_id, sheet = "SpC")
-        SpC_sheet <- as.data.frame(SpC_sheet)
-        row <- which(SpC_sheet$observation_ID == calibration_data$next_id)+1
-        googlesheets4::range_write(calibrations_id, data = calibration_data$SpC, sheet = "SpC", range = paste0("A", row), col_names = FALSE, reformat = FALSE)
-      }
-      if (!complete$basic){
-        if (!("Basic info" %in% send_table$saved)){
-          calibration_data$basic <- data.frame(observation_ID = calibration_data$next_id,
-                                               observer = "NOT SET",
-                                               obs_datetime = .POSIXct(Sys.time(), tz = "MST"),
-                                               ID_sensor_holder = "NOT SET",
-                                               ID_handheld_meter = "NOT SET",
-                                               complete = FALSE)
-          googlesheets4::sheet_append(calibrations_id, sheet="observations", data = calibration_data$basic)
-          complete$basic <- TRUE
-        }
-      }
-      if ("Conductivity calibration" %in% send_table$saved[ ,1] | "Conductivity calibration" %in% send_table$restarted_cal[ ,1]){
-        shinyalert::shinyalert(title = "Conductivity calibration overwritten", type = "success", timer = 2000, immediate = TRUE)
-      } else {
-        shinyalert::shinyalert(title = "Conductivity calibration saved", type = "success", timer = 2000, immediate = TRUE)
-      }
-      if (send_table$saved[1,1] == "Nothing saved yet"){
-        send_table$saved[1,1] <- "Conductivity calibration"
-      } else if (!("Conductivity calibration" %in% send_table$saved[ ,1])) {
-        send_table$saved[nrow(send_table$saved)+1,1] <- "Conductivity calibration"
-      }
-      output$saved <- renderTable({ # Display local calibrations table
-        send_table$saved
-      })
+    if (input$spc_or_not & is.null(calibration_data$temp)){
+      shinyalert::shinyalert("Calibrate temperature first!", "You must calibrate temperature first if entering non-specific conductivity")
     } else {
-      shinyalert::shinyalert(title = "Validate your measurements first!", type = "error", timer = 2000)
+      if (validation_check$SpC){
+        shinyalert::shinyalert(title = "Saving...", type = "info")
+        calibration_data$SpC <- data.frame(observation_ID = calibration_data$next_id,
+                                           SpC1_std = input$SpC1_std,
+                                           SpC1_pre = if (input$spc_or_not) input$SpC1_pre/(1+0.02*(calibration_data$temp$temp_reference - 25)) else input$SpC1_pre,
+                                           SpC1_post = if (input$spc_or_not) input$SpC1_post/(1+0.02*(calibration_data$temp$temp_reference - 25)) else input$SpC1_post,
+                                           SpC2_std = input$SpC2_std,
+                                           SpC2_pre = if (input$spc_or_not) input$SpC2_pre/(1+0.02*(calibration_data$temp$temp_reference - 25)) else input$SpC2_pre,
+                                           SpC2_post = if (input$spc_or_not) input$SpC2_post/(1+0.02*(calibration_data$temp$temp_reference - 25)) else input$SpC2_post)
+        if (!complete$SpC){
+          googlesheets4::sheet_append(calibrations_id, sheet="SpC", data = calibration_data$SpC)
+          complete$SpC <- TRUE
+          shinyjs::show("delete_SpC")
+        } else {
+          SpC_sheet <- googlesheets4::read_sheet(calibrations_id, sheet = "SpC")
+          SpC_sheet <- as.data.frame(SpC_sheet)
+          row <- which(SpC_sheet$observation_ID == calibration_data$next_id)+1
+          googlesheets4::range_write(calibrations_id, data = calibration_data$SpC, sheet = "SpC", range = paste0("A", row), col_names = FALSE, reformat = FALSE)
+        }
+        if (!complete$basic){
+          if (!("Basic info" %in% send_table$saved)){
+            calibration_data$basic <- data.frame(observation_ID = calibration_data$next_id,
+                                                 observer = "NOT SET",
+                                                 obs_datetime = as.character(.POSIXct(Sys.time(), tz = "MST")),
+                                                 ID_sensor_holder = "NOT SET",
+                                                 ID_handheld_meter = "NOT SET",
+                                                 complete = FALSE)
+            googlesheets4::sheet_append(calibrations_id, sheet="observations", data = calibration_data$basic)
+            complete$basic <- TRUE
+          }
+        }
+        if ("Conductivity calibration" %in% send_table$saved[ ,1] | "Conductivity calibration" %in% send_table$restarted_cal[ ,1]){
+          shinyalert::shinyalert(title = "Conductivity calibration overwritten", type = "success", timer = 2000, immediate = TRUE)
+        } else {
+          shinyalert::shinyalert(title = "Conductivity calibration saved", type = "success", timer = 2000, immediate = TRUE)
+        }
+        if (send_table$saved[1,1] == "Nothing saved yet"){
+          send_table$saved[1,1] <- "Conductivity calibration"
+        } else if (!("Conductivity calibration" %in% send_table$saved[ ,1])) {
+          send_table$saved[nrow(send_table$saved)+1,1] <- "Conductivity calibration"
+        }
+        output$saved <- renderTable({ # Display local calibrations table
+          send_table$saved
+        })
+      } else {
+        shinyalert::shinyalert(title = "Validate your measurements first!", type = "error", timer = 2000)
+      }
     }
   })
   observeEvent(input$delete_SpC, {
@@ -1836,7 +1907,6 @@ app_server <- function(input, output, session) {
       send_table$restarted_cal
     })
     complete$SpC <- FALSE
-    shinyjs::hide("delete_SpC")
   })
 
   ### Save/Delete turbidity
@@ -1864,7 +1934,7 @@ app_server <- function(input, output, session) {
         if (!("Basic info" %in% send_table$saved)){
           calibration_data$basic <- data.frame(observation_ID = calibration_data$next_id,
                                                observer = "NOT SET",
-                                               obs_datetime = .POSIXct(Sys.time(), tz = "MST"),
+                                               obs_datetime = as.character(.POSIXct(Sys.time(), tz = "MST")),
                                                ID_sensor_holder = "NOT SET",
                                                ID_handheld_meter = "NOT SET",
                                                complete = FALSE)
@@ -1915,7 +1985,6 @@ app_server <- function(input, output, session) {
       send_table$restarted_cal
     })
     complete$turbidity <- FALSE
-    shinyjs::hide("delete_turb")
   })
 
   ### Save/Delete DO
@@ -1941,7 +2010,7 @@ app_server <- function(input, output, session) {
         if (!("Basic info" %in% send_table$saved)){
           calibration_data$basic <- data.frame(observation_ID = calibration_data$next_id,
                                                observer = "NOT SET",
-                                               obs_datetime = .POSIXct(Sys.time(), tz = "MST"),
+                                               obs_datetime = as.character(.POSIXct(Sys.time(), tz = "MST")),
                                                ID_sensor_holder = "NOT SET",
                                                ID_handheld_meter = "NOT SET",
                                                complete = FALSE)
@@ -1992,7 +2061,6 @@ app_server <- function(input, output, session) {
       send_table$restarted_cal
     })
     complete$DO <- FALSE
-    shinyjs::hide("delete_DO")
   })
 
   ### Save/Delete depth
@@ -2016,7 +2084,7 @@ app_server <- function(input, output, session) {
         if (!("Basic info" %in% send_table$saved)){
           calibration_data$basic <- data.frame(observation_ID = calibration_data$next_id,
                                                observer = "NOT SET",
-                                               obs_datetime = .POSIXct(Sys.time(), tz = "MST"),
+                                               obs_datetime = as.character(.POSIXct(Sys.time(), tz = "MST")),
                                                ID_sensor_holder = "NOT SET",
                                                ID_handheld_meter = "NOT SET",
                                                complete = FALSE)
@@ -2067,7 +2135,6 @@ app_server <- function(input, output, session) {
       send_table$restarted_cal
     })
     complete$depth <- FALSE
-    shinyjs::hide("delete_depth")
   })
 
 
@@ -2083,10 +2150,11 @@ app_server <- function(input, output, session) {
                                  observations <- googlesheets4::read_sheet(calibrations_id, sheet = "observations")
                                  observations <- as.data.frame(observations)
                                  googlesheets4::range_write(calibrations_id, data = data.frame(complete = TRUE), sheet = "observations", range = paste0("F", which(observations$observation_ID == calibration_data$next_id)+1), col_names = FALSE, reformat = FALSE)
+                                 observations[observations$observation_ID == calibration_data$next_id, "complete"] <- TRUE  #mark as complete in the local df as well
                                  shinyalert::shinyalert(title = paste0("Calibration finalized."),
                                                         type = "success", immediate = TRUE)
                                  #Reset fields
-                                 reset_basic()
+                                 reset_basic(keep_observer = TRUE)
                                  reset_ph()
                                  reset_temp()
                                  reset_orp()
@@ -2094,16 +2162,33 @@ app_server <- function(input, output, session) {
                                  reset_turb()
                                  reset_do()
                                  reset_depth()
-                                 #Reset tables
-                                 # remake df from scratch
+                                 # Reset complete flags
+                                 complete$basic <- FALSE
+                                 complete$temperature <- FALSE
+                                 complete$SpC <- FALSE
+                                 complete$pH <- FALSE
+                                 complete$orp <- FALSE
+                                 complete$turbidity <- FALSE
+                                 complete$DO <- FALSE
+                                 complete$depth <- FALSE
+                                 # Reset data.frames
+                                 calibration_data$basic <- NULL
+                                 calibration_data$temperature <- NULL
+                                 calibration_data$SpC <- NULL
+                                 calibration_data$pH <- NULL
+                                 calibration_data$orp <- NULL
+                                 calibration_data$turbidity <- NULL
+                                 calibration_data$DO <- NULL
+                                 calibration_data$depth <- NULL
+                                 # Reset tables
                                  send_table$saved <- data.frame("Saved calibrations" = "Nothing saved yet", check.names = FALSE) #Title is modified later for clarity if user want to restart a cal
-                                 send_table$restarted_cal <- data.frame("Saved calibrations (recovered session)" = "Basic info", check.names = FALSE)
                                  output$saved <- renderTable({ # Display local calibrations table
                                    send_table$saved
                                  })
-                                 output$restart_table <- renderTable({ # Display remotely saved calibrations tables
-                                   send_table$restarted_cal
-                                 })
+                                 shinyjs::hide("restart_table")
+                                 updateNumericInput(session, "restart_index", value = 0) #in case the user was restarting an old calibration
+                                 updateSelectInput(session, "first_selection", selected = "Calibrate")
+                                 updateSelectInput(session, "selection", selected = "Basic calibration info")
                                  #Get the next ID in case user is calibrating/working in app again
                                  calibration_data$next_id <- max(observations$observation_ID) + 1
                                }
