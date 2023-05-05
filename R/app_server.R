@@ -214,6 +214,8 @@ app_server <- function(input, output, session) {
   reset_do <- function(){
     updateNumericInput(session, "baro_press_pre", label = "Baro Pressure Pre-Cal", value = "")
     updateNumericInput(session, "baro_press_post", label = "Baro Pressure Post-Cal", value = "")
+    updateNumericInput(session, "DO_pre_prct", label = "DO Pre-Cal %", value = "")
+    updateNumericInput(session, "DO_post_prct", label = "DO Post-Cal %", value = "")
     updateNumericInput(session, "DO_pre", label = "DO Pre-Cal mg/L", value = "")
     updateNumericInput(session, "DO_post", label = "DO Post-Cal mg/L", value = "")
     shinyjs::hide("delete_DO")
@@ -1020,7 +1022,7 @@ app_server <- function(input, output, session) {
   observeEvent(input$save_cal_instrument, { #save the new record or the changes to existing record
     if (nrow(instruments_data$sheet) == 0){ #if there are no instruments listed yet...
       new_id <- 1
-      check <- FALSE #definitly does not exist yet
+      check <- FALSE #definitely does not exist yet
     } else {
       new_id <- max(as.numeric(instruments_data$sheet$instrument_ID) + 1)
       check <- input$serial_no %in% instruments_data$sheet$serial_no #check to make sure the serial no does not already exist
@@ -1252,6 +1254,67 @@ app_server <- function(input, output, session) {
       updateNumericInput(session, "SpC2_post", label = "SpC High-Range Post-Cal Value")
     }
   })
+
+
+  DO_calc <- function(pre_post, prct_abs, messages = TRUE){
+    trigger_name <- if (pre_post == "pre" & prct_abs == "prct") "DO_pre_prct" else if (pre_post == "pre" & prct_abs == "abs") "DO_pre" else if (pre_post == "post" & prct_abs == "prct") "DO_post_prct" else if (pre_post == "post" & prct_abs == "abs") "DO_post"
+    update_name <- if (pre_post == "pre" & prct_abs == "prct") "DO_pre" else if (pre_post == "pre" & prct_abs == "abs") "DO_pre_prct" else if (pre_post == "post" & prct_abs == "prct") "DO_post" else if (pre_post == "post" & prct_abs == "abs") "DO_post_prct"
+    baro_press <- if(pre_post == "pre") input$baro_press_pre else input$baro_press_post
+    meas <- input[[trigger_name]]
+    temp <- input$temp_observed
+    go_baro <- FALSE
+    go_temp <- FALSE
+
+    if (!is.na(baro_press)){
+      if (baro_press < 600 | baro_press > 850){
+        if (pre_post == "pre"){
+          shinyalert::shinyalert("Pre-calibration baro pressure out of range", "Enter pressure in mmHg only", type = "error", timer = 3000)
+        } else {
+          shinyalert::shinyalert("Post-calibration baro pressure out of range", "Enter pressure in mmHg only", type = "error", timer = 3000)
+        }
+      } else {
+        go_baro <- TRUE
+      }
+    } else {
+      if (pre_post == "pre"){
+        shinyalert::shinyalert("Enter pre-cal baro pressures in mmHg first!", type = "error", timer = 3000)
+      } else {
+        shinyalert::shinyalert("Enter post-cal baro pressures in mmHg first!", type = "error", timer = 3000)
+      }
+    }
+    if (!is.na(temp)) {
+      if (temp < 0 | temp > 30){
+        if (messages){
+          shinyalert::shinyalert("Temperature out of range", "Temp should be between 0 and 30 degrees C; review temperature calibration", type = "error", timer = 3000)
+        }
+      } else {
+        go_temp <- TRUE
+      }
+    } else {
+      if (messages){
+        shinyalert::shinyalert("Enter temperature data first!", "Go to the temperature calibration", type = "error", timer = 3000)
+      }
+    }
+    if (!is.na(meas) & meas > 0 & go_baro & go_temp){
+      res <- suppressWarnings(respR::convert_DO(meas, from = if (grepl("prct", trigger_name)) "%Air" else "mg/l", to = if (grepl("prct", trigger_name)) "mg/l" else "%Air", S = 0, t = temp, P = baro_press / 750.06156130264))
+      updateNumericInput(session, update_name, value = round(res, 2))
+      if (messages){
+        shinyalert::shinyalert("You MUST recalculate if updating baro pressures or temperature", "Cannot auto-update without knowing which value (mg/l or %) to update", timer = 4000)
+      }
+      updateActionButton(session, "calc_abs_DO", "Recalc mg/l values")
+      updateActionButton(session, "calc_prct_DO", "Recalc % values")
+    }
+  }
+
+  observeEvent(input$calc_abs_DO, {
+    DO_calc(pre_post = "pre", prct_abs = "prct")
+    DO_calc(pre_post = "post", prct_abs = "prct", messages = FALSE)
+  }, ignoreInit = T)
+  observeEvent(input$calc_prct_DO, {
+    DO_calc(pre_post = "pre", prct_abs = "abs")
+    DO_calc(pre_post = "post", prct_abs = "abs", messages = FALSE)
+  }, ignoreInit = T)
+
 
   observeEvent(input$ID_sensor_holder, {
     if (nrow(instruments_data$others[instruments_data$others$serial_no == input$ID_sensor_holder, ]) > 0){
@@ -1505,15 +1568,29 @@ app_server <- function(input, output, session) {
   })
   validation_check$DO <- FALSE
   observeEvent(input$validate_DO, { #Deal with DO
+    NFG <- FALSE
     tryCatch({
       baro_post <- input$baro_press_post
       DO_post <- input$DO_post
-      shinyalert::shinyalert(title = "Good to go!", type = "success", timer = 2000)
-      validation_check$DO <- TRUE
+      if (baro_post < 600 | baro_post > 800){
+        shinyalert::shinyalert(title = "Baro pressures are not in range", "You must enter baro pressure in mmHg", type = "error", timer = 2000)
+        validation_check$DO <- FALSE
+        NFG <- TRUE
+      }
+      if (DO_post < 1 |DO_post > 15){
+        shinyalert::shinyalert(title = "DO post-calibration values are out of range", "Are you sure you entered % and mg/l in the right boxes? Only mg/l is saved, use the Fill/recalculate button.", type = "error", timer = 5000)
+        validation_check$DO <- FALSE
+        NFG <- TRUE
+      }
+      if (!NFG){
+        shinyalert::shinyalert(title = "Good to go!", type = "success", timer = 2000)
+        validation_check$DO <- TRUE
+      }
     }, error = function(e) {
-      shinyalert::shinyalert(title = "You have unfilled mandatory entries", type = "error", timer = 2000)
+      shinyalert::shinyalert(title = "You have unfilled mandatory entries", "Baro pressure and DO in mg/l are mandatory", type = "error", timer = 4000)
     })
   })
+
   validation_check$depth <- FALSE
   observeEvent(input$validate_depth, { #Deal with depth
     tryCatch({
