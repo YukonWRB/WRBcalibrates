@@ -129,8 +129,62 @@ app_server <- function(input, output, session) {
   shinyjs::hide("add.change_sensor.comment")
   shinyjs::hide("restart_table")
 
-  #message for the instrument management table
+  # Hide the pH, ORP, and turbidity post-cal fields. They're still in the UI and in the code below in case ever needed, but hidden from view. Their values reflect the standard solution values, though a user could modify the fields if they become visible
+  shinyjs::hide("pH1_post_val")
+  shinyjs::hide("pH2_post_val")
+  shinyjs::hide("pH3_post_val")
+  shinyjs::hide("orp_post_mV")
+  shinyjs::hide("turb1_post")
+  shinyjs::hide("turb2_post")
+  shinyjs::hide("SpC1_post")
+  shinyjs::hide("SpC2_post")
 
+  observeEvent(input$show_post_pH, {
+    if ((input$show_post_pH %% 2) == 0){
+      shinyjs::hide("pH1_post_val")
+      shinyjs::hide("pH2_post_val")
+      shinyjs::hide("pH3_post_val")
+      updateActionButton(session, "show_post_pH", label = "Show post-cal fields")
+    } else {
+      shinyjs::show("pH1_post_val")
+      shinyjs::show("pH2_post_val")
+      shinyjs::show("pH3_post_val")
+      updateActionButton(session, "show_post_pH", label = "Hide post-cal fields")
+    }
+  }, ignoreInit = TRUE)
+  observeEvent(input$show_post_orp, {
+    if ((input$show_post_orp %% 2) == 0){
+      shinyjs::hide("orp_post_mV")
+      updateActionButton(session, "show_post_orp", label = "Show post-cal fields")
+    } else {
+      shinyjs::show("orp_post_mV")
+      updateActionButton(session, "show_post_orp", label = "Hide post-cal fields")
+    }
+  }, ignoreInit = TRUE)
+  observeEvent(input$show_post_turb, {
+    if ((input$show_post_turb %% 2) == 0){
+      shinyjs::hide("turb1_post")
+      shinyjs::hide("turb2_post")
+      updateActionButton(session, "show_post_turb", label = "Show post-cal fields")
+    } else {
+      shinyjs::show("turb1_post")
+      shinyjs::show("turb2_post")
+      updateActionButton(session, "show_post_turb", label = "Hide post-cal fields")
+    }
+  }, ignoreInit = TRUE)
+  observeEvent(input$show_post_SpC, {
+    if ((input$show_post_SpC %% 2) == 0){
+      shinyjs::hide("SpC1_post")
+      shinyjs::hide("SpC2_post")
+      updateActionButton(session, "show_post_SpC", label = "Show post-cal fields")
+    } else {
+      shinyjs::show("SpC1_post")
+      shinyjs::show("SpC2_post")
+      updateActionButton(session, "show_post_SpC", label = "Hide post-cal fields")
+    }
+  }, ignoreInit = TRUE)
+
+  #message for the instrument management table
   messages$instrument_reminder <- "Add your instrument if not listed!"
   messages$add_sensor_note <- "Caution: adds new sensor slot. To change sensor type, click on it for new options."
 
@@ -168,11 +222,11 @@ app_server <- function(input, output, session) {
     updateNumericInput(session, "pH2_std", label = "Neutral pH solution value", value = "7")
     updateNumericInput(session, "pH3_std", label = "High pH solution value", value = "10")
     updateNumericInput(session, "pH1_pre_val", label = "pH 4 Pre-Cal Value", value = "")
-    updateNumericInput(session, "pH1_pre_mV", label = "pH 4 Pre-Cal mV", value = "")
+    updateNumericInput(session, "pH1_pre_mV", label = "pH 4 mV", value = "")
     updateNumericInput(session, "pH2_pre_val", label = "pH 7 Pre-Cal Value", value = "")
-    updateNumericInput(session, "pH2_pre_mV", label = "pH 7 Pre-Cal mV", value = "")
+    updateNumericInput(session, "pH2_pre_mV", label = "pH 7 mV", value = "")
     updateNumericInput(session, "pH3_pre_val", label = "pH 10 Pre-Cal Value", value = "")
-    updateNumericInput(session, "pH3_pre_mV", label = "pH 10 Pre-Cal mV", value = "")
+    updateNumericInput(session, "pH3_pre_mV", label = "pH 10 mV", value = "")
     updateNumericInput(session, "pH1_post_val", label = "pH 4 Post-Cal Value", value = "")
     updateNumericInput(session, "pH1_post_mV", label = "pH 4 Post-Cal mV", value = "")
     updateNumericInput(session, "pH2_post_val", label = "pH 7 Post-Cal Value", value = "")
@@ -228,8 +282,8 @@ app_server <- function(input, output, session) {
 
 
   instruments_data$sheet <- instruments_sheet #assign to a reactive
-  instruments_data$handhelds <- instruments_sheet[instruments_sheet$type == "Handheld (connects to bulkheads)" & is.na(instruments_sheet$date_retired) , ]
-  instruments_data$others <- instruments_sheet[instruments_sheet$type != "Handheld (connects to bulkheads)" & is.na(instruments_sheet$date_retired) , ]
+  instruments_data$handhelds <- instruments_sheet[instruments_sheet$type == "Handheld (connects to bulkhead)" & is.na(instruments_sheet$date_retired) , ]
+  instruments_data$others <- instruments_sheet[instruments_sheet$type != "Handheld (connects to bulkhead)" & is.na(instruments_sheet$date_retired) , ]
   instruments_data$maintainable <- instruments_sheet[instruments_sheet$type %in% c("Sonde (multi-param deployable, interchangeable sensors)", "Bulkhead (requires handheld, not deployable)") , ]
 
   initial_manage_instruments_table <- instruments_sheet[ , !colnames(instruments_sheet) %in% c("instrument_ID", "observer", "obs_datetime")]
@@ -246,12 +300,10 @@ app_server <- function(input, output, session) {
   observeEvent(input$observer, {
       updateSelectizeInput(session, "ID_sensor_holder", choices = c("", instruments_data$others$serial_no))
       updateSelectizeInput(session, "ID_handheld_meter", choices = c("NA", instruments_data$handhelds$serial_no))
-
   })
   observeEvent(input$calibration_instruments_table_cell_clicked, {
       updateSelectizeInput(session, "ID_sensor_holder", choices = c("", instruments_data$others$serial_no))
       updateSelectizeInput(session, "ID_handheld_meter", choices = c("NA", instruments_data$handhelds$serial_no))
-
   })
 
   # query the observations sheet for increment number and unfinished calibrations
@@ -277,22 +329,34 @@ app_server <- function(input, output, session) {
 
   observeEvent(input$pH1_std, {
     updateNumericInput(session, "pH1_pre_val", label = paste0("pH ", input$pH1_std, " Pre-Cal Value"))
-    updateNumericInput(session, "pH1_pre_mV", label = paste0("pH ", input$pH1_std, " Pre-Cal mV"))
-    updateNumericInput(session, "pH1_post_val", label = paste0("pH ", input$pH1_std, " Post-Cal Value"))
-    updateNumericInput(session, "pH1_post_mV", label = paste0("pH ", input$pH1_std, " Post-Cal mV"))
-  })
+    updateNumericInput(session, "pH1_mV", label = paste0("pH ", input$pH1_std, " mV"))
+    updateNumericInput(session, "pH1_post_val", label = paste0("pH ", input$pH1_std, " Post-Cal Value"), value = input$pH1_std)
+  }, ignoreInit = TRUE)
   observeEvent(input$pH2_std, {
     updateNumericInput(session, "pH2_pre_val", label = paste0("pH ", input$pH2_std, " Pre-Cal Value"))
-    updateNumericInput(session, "pH2_pre_mV", label = paste0("pH ", input$pH2_std, " Pre-Cal mV"))
-    updateNumericInput(session, "pH2_post_val", label = paste0("pH ", input$pH2_std, " Post-Cal Value"))
-    updateNumericInput(session, "pH2_post_mV", label = paste0("pH ", input$pH2_std, " Post-Cal mV"))
-  })
+    updateNumericInput(session, "pH2_mV", label = paste0("pH ", input$pH2_std, " mV"))
+    updateNumericInput(session, "pH2_post_val", label = paste0("pH ", input$pH2_std, " Post-Cal Value"), value = input$pH2_std)
+  }, ignoreInit = TRUE)
   observeEvent(input$pH3_std, {
     updateNumericInput(session, "pH3_pre_val", label = paste0("pH ", input$pH3_std, " Pre-Cal Value"))
-    updateNumericInput(session, "pH3_pre_mV", label = paste0("pH ", input$pH3_std, " Pre-Cal mV"))
-    updateNumericInput(session, "pH3_post_val", label = paste0("pH ", input$pH3_std, " Post-Cal Value"))
-    updateNumericInput(session, "pH3_post_mV", label = paste0("pH ", input$pH3_std, " Post-Cal mV"))
-  })
+    updateNumericInput(session, "pH3_mV", label = paste0("pH ", input$pH3_std, " mV"))
+    updateNumericInput(session, "pH3_post_val", label = paste0("pH ", input$pH3_std, " Post-Cal Value"), value = input$pH3_std)
+  }, ignoreInit = TRUE)
+  observeEvent(input$orp_std, {
+    updateNumericInput(session, "orp_post_mV", value = input$orp_std)
+  }, ignoreInit = TRUE)
+  observeEvent(input$turb1_std, {
+    updateNumericInput(session, "turb1_post", value = input$turb1_std)
+  }, ignoreInit = TRUE)
+  observeEvent(input$turb2_std, {
+    updateNumericInput(session, "turb2_post", value = input$turb2_std)
+  }, ignoreInit = TRUE)
+  observeEvent(input$SpC1_std, {
+    updateNumericInput(session, "SpC1_post", value = input$SpC1_std)
+  }, ignoreInit = TRUE)
+  observeEvent(input$SpC2_std, {
+    updateNumericInput(session, "SpC2_post", value = input$SpC2_std)
+  }, ignoreInit = TRUE)
 
   #observeEvents for when the user selects a particular page
   observeEvent(input$first_selection, {
@@ -325,8 +389,12 @@ app_server <- function(input, output, session) {
       shinyjs::hide("add_comment")
       shinyjs::hide("add.change_sensor.comment_name")
       shinyjs::hide("add.change_sensor.comment")
+      shinyjs::hide("date_retired")
+      shinyjs::hide("retired_by")
       updateSelectInput(session, "existing_serial_no", choices = c("New record", instruments_data$sheet$serial_no))
       updateDateInput(session, "date_retired", value = NA) #Reset the retired date to NA
+      updateDateInput(session, "date_in_service", value = NA)
+      updateDateInput(session, "date_purchased", value = NA)
       instruments_data$manage_instruments <- instruments_data$sheet[ , !colnames(instruments_data$sheet) %in% c("instrument_ID", "observer", "obs_datetime")]
       instruments_data$manage_instruments$type <- gsub(" .*", "", instruments_data$manage_instruments$type)
       output$manage_instruments_table <- DT::renderDataTable(instruments_data$manage_instruments, rownames = FALSE)
@@ -405,10 +473,18 @@ app_server <- function(input, output, session) {
       shinyjs::hide("add.change_sensor.comment_name")
       shinyjs::hide("add.change_sensor.comment")
       updateNumericInput(session, "restart_index", min = 0, max = nrow(incomplete_observations))
-    }
+    } # else if (input$first_selection == "View completed calibrations"){
+    #   shinyjs::hide("submit_btn")
+    # }
   })
 
-  ###observeEvents related to maintenance of instruments
+
+  # ### code and observeEvents to display/filter old calibrations to the user
+  # observeEvent(input$filter_old_cals, {
+  #
+  # })
+
+  ### observeEvents related to maintenance of instruments
   observeEvent(input$maintain_serial, {
     shinyjs::show("load_sensors")
     shinyjs::hide("sensor1_show")
@@ -451,7 +527,7 @@ app_server <- function(input, output, session) {
       sensors_data$instrument_table
     })
     shinyjs::show("instrument_details") #if hidden because the user went and looked at sensors from another instrument
-  })
+  }, ignoreInit = TRUE)
   observeEvent(input$load_sensors, {
     if (input$maintain_serial != "loading choices..."){
       shinyjs::hide("load_sensors")
@@ -470,20 +546,22 @@ app_server <- function(input, output, session) {
       if (sensors_data$number > 0){
         for (i in 1:sensors_data$number){ #show the right number of sensors
           shinyjs::show(paste0("sensor", i, "_show"))
-          updateActionButton(session, paste0("sensor", i, "_show"), label = HTML(paste0("Sensor ", i, "<br>", sensors_data$sensor[nrow(sensors_data$sensor), paste0("sensor", i, "_type")])))
+          updateActionButton(session, paste0("sensor", i, "_show"), label = HTML(paste0("Slot ", i, "<br>", sensors_data$sensor[nrow(sensors_data$sensor), paste0("sensor", i, "_type")])))
           if (i == 8){
             shinyjs::hide("add_sensor_dropdown")
           }
         }
       }
     }
-  })
+  }, ignoreInit = TRUE)
+
   observeEvent(input$add_sensor_dropdown, {
     shinyjs::show("add_sensor")
     shinyjs::show("new_sensor_serial")
     shinyjs::show("add_sensor_note")
     shinyjs::show("add_sensor_name")
-  })
+  }, ignoreInit = TRUE)
+
   observeEvent(input$add_sensor, { # edit the data.table, making a new entry
     comment <- paste0("Added a new sensor: ", input$add_sensor_dropdown, " added")
     #find out if an entry already has the timestamp sensors_data$datetime. if not, new line.
@@ -567,11 +645,11 @@ app_server <- function(input, output, session) {
     shinyjs::hide("add_sensor")
     shinyjs::hide("new_sensor_serial")
     shinyjs::hide("add_sensor_note")
-    lab <- paste0("Sensor ", sensors_data$number + 1, "<br>", sensors_data$sensor[nrow(sensors_data$sensor), type_col])
+    lab <- paste0("Slot ", sensors_data$number + 1, "<br>", sensors_data$sensor[nrow(sensors_data$sensor), type_col])
     updateActionButton(session, paste0("sensor", sensors_data$number + 1, "_show"), label = HTML(lab))
     sensors_data$number <- sensors_data$number + 1
     sensors_data$datetime_exists <- TRUE
-  })
+  }, ignoreInit = TRUE)
 
   observeEvent(input$sensor1_show, {
     sensors_data$selected <- "sensor1"
@@ -604,14 +682,14 @@ app_server <- function(input, output, session) {
     shinyjs::show("add.change_sensor.comment_name")
     shinyjs::show("add_sensor_serial")
     shinyjs::runjs('document.getElementById("sensor1_show").style.color = "#00BFFF";')
-    shinyjs::runjs('document.getElementById("sensor2_show").style.color = "#FFFFFF";')
-    shinyjs::runjs('document.getElementById("sensor3_show").style.color = "#FFFFFF";')
-    shinyjs::runjs('document.getElementById("sensor4_show").style.color = "#FFFFFF";')
-    shinyjs::runjs('document.getElementById("sensor5_show").style.color = "#FFFFFF";')
-    shinyjs::runjs('document.getElementById("sensor6_show").style.color = "#FFFFFF";')
-    shinyjs::runjs('document.getElementById("sensor7_show").style.color = "#FFFFFF";')
-    shinyjs::runjs('document.getElementById("sensor8_show").style.color = "#FFFFFF";')
-  })
+    shinyjs::runjs('document.getElementById("sensor2_show").style.color = "#000000";')
+    shinyjs::runjs('document.getElementById("sensor3_show").style.color = "#000000";')
+    shinyjs::runjs('document.getElementById("sensor4_show").style.color = "#000000";')
+    shinyjs::runjs('document.getElementById("sensor5_show").style.color = "#000000";')
+    shinyjs::runjs('document.getElementById("sensor6_show").style.color = "#000000";')
+    shinyjs::runjs('document.getElementById("sensor7_show").style.color = "#000000";')
+    shinyjs::runjs('document.getElementById("sensor8_show").style.color = "#000000";')
+  }, ignoreInit = TRUE)
   observeEvent(input$sensor2_show, {
     sensors_data$selected <- "sensor2"
     sensors_data$sensor2_details <- data.frame("Time/date"= substr(sensors_data$sensor$obs_datetime, 1, 16),
@@ -643,15 +721,15 @@ app_server <- function(input, output, session) {
     shinyjs::show("add_comment")
     shinyjs::show("add.change_sensor.comment_name")
     shinyjs::show("add_sensor_serial")
-    shinyjs::runjs('document.getElementById("sensor1_show").style.color = "#FFFFFF";')
+    shinyjs::runjs('document.getElementById("sensor1_show").style.color = "#000000";')
     shinyjs::runjs('document.getElementById("sensor2_show").style.color = "#00BFFF";')
-    shinyjs::runjs('document.getElementById("sensor3_show").style.color = "#FFFFFF";')
-    shinyjs::runjs('document.getElementById("sensor4_show").style.color = "#FFFFFF";')
-    shinyjs::runjs('document.getElementById("sensor5_show").style.color = "#FFFFFF";')
-    shinyjs::runjs('document.getElementById("sensor6_show").style.color = "#FFFFFF";')
-    shinyjs::runjs('document.getElementById("sensor7_show").style.color = "#FFFFFF";')
-    shinyjs::runjs('document.getElementById("sensor8_show").style.color = "#FFFFFF";')
-  })
+    shinyjs::runjs('document.getElementById("sensor3_show").style.color = "#000000";')
+    shinyjs::runjs('document.getElementById("sensor4_show").style.color = "#000000";')
+    shinyjs::runjs('document.getElementById("sensor5_show").style.color = "#000000";')
+    shinyjs::runjs('document.getElementById("sensor6_show").style.color = "#000000";')
+    shinyjs::runjs('document.getElementById("sensor7_show").style.color = "#000000";')
+    shinyjs::runjs('document.getElementById("sensor8_show").style.color = "#000000";')
+  }, ignoreInit = TRUE)
   observeEvent(input$sensor3_show, {
     sensors_data$selected <- "sensor3"
     sensors_data$sensor3_details <- data.frame("Time/date"= substr(sensors_data$sensor$obs_datetime, 1, 16),
@@ -683,15 +761,15 @@ app_server <- function(input, output, session) {
     shinyjs::show("add_comment")
     shinyjs::show("add.change_sensor.comment_name")
     shinyjs::show("add_sensor_serial")
-    shinyjs::runjs('document.getElementById("sensor1_show").style.color = "#FFFFFF";')
-    shinyjs::runjs('document.getElementById("sensor2_show").style.color = "#FFFFFF";')
+    shinyjs::runjs('document.getElementById("sensor1_show").style.color = "#000000";')
+    shinyjs::runjs('document.getElementById("sensor2_show").style.color = "#000000";')
     shinyjs::runjs('document.getElementById("sensor3_show").style.color = "#00BFFF";')
-    shinyjs::runjs('document.getElementById("sensor4_show").style.color = "#FFFFFF";')
-    shinyjs::runjs('document.getElementById("sensor5_show").style.color = "#FFFFFF";')
-    shinyjs::runjs('document.getElementById("sensor6_show").style.color = "#FFFFFF";')
-    shinyjs::runjs('document.getElementById("sensor7_show").style.color = "#FFFFFF";')
-    shinyjs::runjs('document.getElementById("sensor8_show").style.color = "#FFFFFF";')
-  })
+    shinyjs::runjs('document.getElementById("sensor4_show").style.color = "#000000";')
+    shinyjs::runjs('document.getElementById("sensor5_show").style.color = "#000000";')
+    shinyjs::runjs('document.getElementById("sensor6_show").style.color = "#000000";')
+    shinyjs::runjs('document.getElementById("sensor7_show").style.color = "#000000";')
+    shinyjs::runjs('document.getElementById("sensor8_show").style.color = "#000000";')
+  }, ignoreInit = TRUE)
   observeEvent(input$sensor4_show, {
     sensors_data$selected <- "sensor4"
     sensors_data$sensor4_details <- data.frame("Time/date"= substr(sensors_data$sensor$obs_datetime, 1, 16),
@@ -723,15 +801,15 @@ app_server <- function(input, output, session) {
     shinyjs::show("add_comment")
     shinyjs::show("add.change_sensor.comment_name")
     shinyjs::show("add_sensor_serial")
-    shinyjs::runjs('document.getElementById("sensor1_show").style.color = "#FFFFFF";')
-    shinyjs::runjs('document.getElementById("sensor2_show").style.color = "#FFFFFF";')
-    shinyjs::runjs('document.getElementById("sensor3_show").style.color = "#FFFFFF";')
+    shinyjs::runjs('document.getElementById("sensor1_show").style.color = "#000000";')
+    shinyjs::runjs('document.getElementById("sensor2_show").style.color = "#000000";')
+    shinyjs::runjs('document.getElementById("sensor3_show").style.color = "#000000";')
     shinyjs::runjs('document.getElementById("sensor4_show").style.color = "#00BFFF";')
-    shinyjs::runjs('document.getElementById("sensor5_show").style.color = "#FFFFFF";')
-    shinyjs::runjs('document.getElementById("sensor6_show").style.color = "#FFFFFF";')
-    shinyjs::runjs('document.getElementById("sensor7_show").style.color = "#FFFFFF";')
-    shinyjs::runjs('document.getElementById("sensor8_show").style.color = "#FFFFFF";')
-  })
+    shinyjs::runjs('document.getElementById("sensor5_show").style.color = "#000000";')
+    shinyjs::runjs('document.getElementById("sensor6_show").style.color = "#000000";')
+    shinyjs::runjs('document.getElementById("sensor7_show").style.color = "#000000";')
+    shinyjs::runjs('document.getElementById("sensor8_show").style.color = "#000000";')
+  }, ignoreInit = TRUE)
   observeEvent(input$sensor5_show, {
     sensors_data$selected <- "sensor5"
     sensors_data$sensor5_details <- data.frame("Time/date"= substr(sensors_data$sensor$obs_datetime, 1, 16),
@@ -763,15 +841,15 @@ app_server <- function(input, output, session) {
     shinyjs::show("add_comment")
     shinyjs::show("add.change_sensor.comment_name")
     shinyjs::show("add_sensor_serial")
-    shinyjs::runjs('document.getElementById("sensor1_show").style.color = "#FFFFFF";')
-    shinyjs::runjs('document.getElementById("sensor2_show").style.color = "#FFFFFF";')
-    shinyjs::runjs('document.getElementById("sensor3_show").style.color = "#FFFFFF";')
-    shinyjs::runjs('document.getElementById("sensor4_show").style.color = "#FFFFFF";')
+    shinyjs::runjs('document.getElementById("sensor1_show").style.color = "#000000";')
+    shinyjs::runjs('document.getElementById("sensor2_show").style.color = "#000000";')
+    shinyjs::runjs('document.getElementById("sensor3_show").style.color = "#000000";')
+    shinyjs::runjs('document.getElementById("sensor4_show").style.color = "#000000";')
     shinyjs::runjs('document.getElementById("sensor5_show").style.color = "#00BFFF";')
-    shinyjs::runjs('document.getElementById("sensor6_show").style.color = "#FFFFFF";')
-    shinyjs::runjs('document.getElementById("sensor7_show").style.color = "#FFFFFF";')
-    shinyjs::runjs('document.getElementById("sensor8_show").style.color = "#FFFFFF";')
-  })
+    shinyjs::runjs('document.getElementById("sensor6_show").style.color = "#000000";')
+    shinyjs::runjs('document.getElementById("sensor7_show").style.color = "#000000";')
+    shinyjs::runjs('document.getElementById("sensor8_show").style.color = "#000000";')
+  }, ignoreInit = TRUE)
   observeEvent(input$sensor6_show, {
     sensors_data$selected <- "sensor6"
     sensors_data$sensor6_details <- data.frame("Time/date"= substr(sensors_data$sensor$obs_datetime, 1, 16),
@@ -803,15 +881,15 @@ app_server <- function(input, output, session) {
     shinyjs::show("add_comment")
     shinyjs::show("add.change_sensor.comment_name")
     shinyjs::show("add_sensor_serial")
-    shinyjs::runjs('document.getElementById("sensor1_show").style.color = "#FFFFFF";')
-    shinyjs::runjs('document.getElementById("sensor2_show").style.color = "#FFFFFF";')
-    shinyjs::runjs('document.getElementById("sensor3_show").style.color = "#FFFFFF";')
-    shinyjs::runjs('document.getElementById("sensor4_show").style.color = "#FFFFFF";')
-    shinyjs::runjs('document.getElementById("sensor5_show").style.color = "#FFFFFF";')
+    shinyjs::runjs('document.getElementById("sensor1_show").style.color = "#000000";')
+    shinyjs::runjs('document.getElementById("sensor2_show").style.color = "#000000";')
+    shinyjs::runjs('document.getElementById("sensor3_show").style.color = "#000000";')
+    shinyjs::runjs('document.getElementById("sensor4_show").style.color = "#000000";')
+    shinyjs::runjs('document.getElementById("sensor5_show").style.color = "#000000";')
     shinyjs::runjs('document.getElementById("sensor6_show").style.color = "#00BFFF";')
-    shinyjs::runjs('document.getElementById("sensor7_show").style.color = "#FFFFFF";')
-    shinyjs::runjs('document.getElementById("sensor8_show").style.color = "#FFFFFF";')
-  })
+    shinyjs::runjs('document.getElementById("sensor7_show").style.color = "#000000";')
+    shinyjs::runjs('document.getElementById("sensor8_show").style.color = "#000000";')
+  }, ignoreInit = TRUE)
   observeEvent(input$sensor7_show, {
     sensors_data$selected <- "sensor7"
     sensors_data$sensor7_details <- data.frame("Time/date"= substr(sensors_data$sensor$obs_datetime, 1, 16),
@@ -843,15 +921,15 @@ app_server <- function(input, output, session) {
     shinyjs::show("add_comment")
     shinyjs::show("add.change_sensor.comment_name")
     shinyjs::show("add_sensor_serial")
-    shinyjs::runjs('document.getElementById("sensor1_show").style.color = "#FFFFFF";')
-    shinyjs::runjs('document.getElementById("sensor2_show").style.color = "#FFFFFF";')
-    shinyjs::runjs('document.getElementById("sensor3_show").style.color = "#FFFFFF";')
-    shinyjs::runjs('document.getElementById("sensor4_show").style.color = "#FFFFFF";')
-    shinyjs::runjs('document.getElementById("sensor5_show").style.color = "#FFFFFF";')
-    shinyjs::runjs('document.getElementById("sensor6_show").style.color = "#FFFFFF";')
+    shinyjs::runjs('document.getElementById("sensor1_show").style.color = "#000000";')
+    shinyjs::runjs('document.getElementById("sensor2_show").style.color = "#000000";')
+    shinyjs::runjs('document.getElementById("sensor3_show").style.color = "#000000";')
+    shinyjs::runjs('document.getElementById("sensor4_show").style.color = "#000000";')
+    shinyjs::runjs('document.getElementById("sensor5_show").style.color = "#000000";')
+    shinyjs::runjs('document.getElementById("sensor6_show").style.color = "#000000";')
     shinyjs::runjs('document.getElementById("sensor7_show").style.color = "#00BFFF";')
-    shinyjs::runjs('document.getElementById("sensor8_show").style.color = "#FFFFFF";')
-  })
+    shinyjs::runjs('document.getElementById("sensor8_show").style.color = "#000000";')
+  }, ignoreInit = TRUE)
   observeEvent(input$sensor8_show, {
     sensors_data$selected <- "sensor8"
     sensors_data$sensor8_details <- data.frame("Time/date"= substr(sensors_data$sensor$obs_datetime, 1, 16),
@@ -883,19 +961,19 @@ app_server <- function(input, output, session) {
     shinyjs::show("add_comment")
     shinyjs::show("add.change_sensor.comment_name")
     shinyjs::show("add_sensor_serial")
-    shinyjs::runjs('document.getElementById("sensor1_show").style.color = "#FFFFFF";')
-    shinyjs::runjs('document.getElementById("sensor2_show").style.color = "#FFFFFF";')
-    shinyjs::runjs('document.getElementById("sensor3_show").style.color = "#FFFFFF";')
-    shinyjs::runjs('document.getElementById("sensor4_show").style.color = "#FFFFFF";')
-    shinyjs::runjs('document.getElementById("sensor5_show").style.color = "#FFFFFF";')
-    shinyjs::runjs('document.getElementById("sensor6_show").style.color = "#FFFFFF";')
-    shinyjs::runjs('document.getElementById("sensor7_show").style.color = "#FFFFFF";')
+    shinyjs::runjs('document.getElementById("sensor1_show").style.color = "#000000";')
+    shinyjs::runjs('document.getElementById("sensor2_show").style.color = "#000000";')
+    shinyjs::runjs('document.getElementById("sensor3_show").style.color = "#000000";')
+    shinyjs::runjs('document.getElementById("sensor4_show").style.color = "#000000";')
+    shinyjs::runjs('document.getElementById("sensor5_show").style.color = "#000000";')
+    shinyjs::runjs('document.getElementById("sensor6_show").style.color = "#000000";')
+    shinyjs::runjs('document.getElementById("sensor7_show").style.color = "#000000";')
     shinyjs::runjs('document.getElementById("sensor8_show").style.color = "#00BFFF";')
-  })
+  }, ignoreInit = TRUE)
 
   observeEvent(input$add.change_sensor.comment_name, {
     shinyjs::show("add.change_sensor.comment") #Now you can save
-  })
+  }, ignoreInit = TRUE)
 
   observeEvent(input$add.change_sensor.comment, {
     if (nchar(input$add.change_sensor.comment_name) <= 2 & nchar(input$add_comment) < 5){
@@ -982,7 +1060,7 @@ app_server <- function(input, output, session) {
       updateActionButton(session, paste0("sensor", gsub("\\D", "", sensors_data$selected), "_show"), label = HTML(lab))
       sensors_data$datetime_exists <- TRUE
     }
-  })
+  }, ignoreInit = TRUE)
 
   observeEvent(input$existing_serial_no, { #populate fields as required
     if (input$existing_serial_no != "New record"){
@@ -1008,8 +1086,6 @@ app_server <- function(input, output, session) {
       updateTextInput(session, "model", value = "")
       updateSelectInput(session, "type", selected = "")
       updateTextInput(session, "asset_tag", value = "")
-      updateDateInput(session, "date_in_service", value = Sys.Date())
-      updateDateInput(session, "date_purchased", value = Sys.Date())
       updateTextInput(session, "retired_by", value = "")
       updateDateInput(session, "date_retired", value = NA)
       updateActionButton(session, "save_cal_instrument", "Save new instrument")
@@ -1017,7 +1093,7 @@ app_server <- function(input, output, session) {
       shinyjs::hide("date_retired")
       shinyjs::hide("retired_by")
     }
-  })
+  }, ignoreInit = TRUE)
 
   observeEvent(input$save_cal_instrument, { #save the new record or the changes to existing record
     if (nrow(instruments_data$sheet) == 0){ #if there are no instruments listed yet...
@@ -1030,6 +1106,7 @@ app_server <- function(input, output, session) {
     if (input$existing_serial_no == "New record"){ #add a new row with the next instrument_ID
       if (check) {
         shinyalert::shinyalert("Serial number already exists!", text = "You selected 'New record' and then entered an existing serial number.", type = "error")
+        new_entry <- FALSE
       } else { #Make a new entry
         instrument.df <- data.frame(instrument_ID = new_id,
                                     observer = input$recorder,
@@ -1045,6 +1122,7 @@ app_server <- function(input, output, session) {
                                     date_retired = if (length(input$date_retired) == 0) NA else as.character(input$date_retired))
         googlesheets4::sheet_append(instruments_id, sheet = "instruments", data = instrument.df)
         shinyalert::shinyalert(paste0("Serial number ", input$serial_no, " added"), type = "success", timer = 2000)
+        new_entry <- TRUE
       }
     } else { #Modify an existing entry
       #find the row number for the existing observation
@@ -1065,17 +1143,32 @@ app_server <- function(input, output, session) {
                                   date_retired = if (length(input$date_retired) == 0) NA else as.character(input$date_retired))
       googlesheets4::range_write(instruments_id, sheet = "instruments", data = instrument.df, range = paste0(row, ":", row) , col_names = FALSE, reformat = FALSE)
       shinyalert::shinyalert(paste0("Serial number ", input$serial_no, " modified"), type = "success", timer = 2000)
+      new_entry <- TRUE
     }
-    #Reload the instruments sheet to reflect modifications
-    instruments_sheet <- googlesheets4::read_sheet(instruments_id, sheet = "instruments")
-    instruments_sheet <- as.data.frame(instruments_sheet)
-    instruments_data$sheet <- instruments_sheet #assign to a reactive again
-    instruments_data$handhelds <- instruments_sheet[instruments_sheet$type == "Handheld (connects to bulkheads)" & is.na(instruments_sheet$date_retired) , ]
-    instruments_data$others <- instruments_sheet[instruments_sheet$type != "Handheld (connects to bulkheads)" & is.na(instruments_sheet$date_retired) , ]
-    updateSelectInput(session, "existing_serial_no", choices = c("New record", instruments_data$sheet$serial_no))
-    updateSelectizeInput(session, "ID_sensor_holder", choices = c("", instruments_data$others$serial_no))
-    updateSelectizeInput(session, "ID_handheld_meter", choices = c("NA", instruments_data$handhelds$serial_no))
-  })
+    if (new_entry){
+      #Reload the instruments sheet to reflect modifications
+      instruments_sheet <- googlesheets4::read_sheet(instruments_id, sheet = "instruments")
+      instruments_sheet <- as.data.frame(instruments_sheet)
+      instruments_data$sheet <- instruments_sheet #assign to a reactive again
+      instruments_data$handhelds <- instruments_sheet[instruments_sheet$type == "Handheld (connects to bulkheads)" & is.na(instruments_sheet$date_retired) , ]
+      instruments_data$others <- instruments_sheet[instruments_sheet$type != "Handheld (connects to bulkheads)" & is.na(instruments_sheet$date_retired) , ]
+      instruments_data$maintainable <- instruments_sheet[instruments_sheet$type %in% c("Sonde (multi-param deployable, interchangeable sensors)", "Bulkhead (requires handheld, not deployable)") , ]
+      #Reset some fields, show/hide others
+      updateSelectInput(session, "existing_serial_no", choices = c("New record", instruments_data$sheet$serial_no), selected = instrument.df$serial_no)
+      updateTextInput(session, "serial_no", value = "")
+      updateSelectizeInput(session, "ID_sensor_holder", choices = c("", instruments_data$others$serial_no)) #For the calibrations page
+      updateSelectizeInput(session, "ID_handheld_meter", choices = c("NA", instruments_data$handhelds$serial_no)) #For the calibrations page
+      shinyjs::hide("serial_no")
+      shinyjs::show("date_retired")
+      shinyjs::show("retired_by")
+      updateActionButton(session, "save_cal_instrument", "Save edits")
+      #Re-render the table
+      instruments_data$manage_instruments <- instruments_data$sheet[ , !colnames(instruments_data$sheet) %in% c("instrument_ID", "observer", "obs_datetime")]
+      instruments_data$manage_instruments$type <- gsub(" .*", "", instruments_data$manage_instruments$type)
+      output$manage_instruments_table <- DT::renderDataTable(instruments_data$manage_instruments, rownames = FALSE)
+
+    }
+  }, ignoreInit = TRUE)
 
   observeEvent(input$restart_calibration, {
     restart_value <- as.numeric(input$restart_index)
@@ -1121,17 +1214,14 @@ app_server <- function(input, output, session) {
             updateNumericInput(session, "pH2_std", value = sheet$pH2_std)
             updateNumericInput(session, "pH3_std", value = sheet$pH3_std)
             updateNumericInput(session, "pH1_pre_val", label = paste0("pH ", sheet$pH1_std, " Pre-Cal Value"), value =  sheet$pH1_pre_val)
-            updateNumericInput(session, "pH1_pre_mV", label = paste0("pH ", sheet$pH1_std, " Pre-Cal mV"), value = sheet$pH1_pre_mV)
+            updateNumericInput(session, "pH1_mV", label = paste0("pH ", sheet$pH1_std, " mV"), value = sheet$pH1_mV)
             updateNumericInput(session, "pH2_pre_val", label = paste0("pH ", sheet$pH2_std, " Pre-Cal Value"), value = sheet$pH2_pre_val)
-            updateNumericInput(session, "pH2_pre_mV", label = paste0("pH ", sheet$pH2_std, " Pre-Cal mV"), value = sheet$pH2_pre_mV)
+            updateNumericInput(session, "pH2_mV", label = paste0("pH ", sheet$pH2_std, " mV"), value = sheet$pH2_mV)
             updateNumericInput(session, "pH3_pre_val", label = paste0("pH ", sheet$pH3_std, " Pre-Cal Value"), value = sheet$pH3_pre_val)
-            updateNumericInput(session, "pH3_pre_mV", label = paste0("pH ", sheet$pH3_std, " Pre-Cal mV"), value = sheet$pH3_pre_mV)
+            updateNumericInput(session, "pH3_mV", label = paste0("pH ", sheet$pH3_std, " mV"), value = sheet$pH3_mV)
             updateNumericInput(session, "pH1_post_val", label = paste0("pH ", sheet$pH1_std, " Post-Cal Value"), value = sheet$pH1_post_val)
-            updateNumericInput(session, "pH1_post_mV", label = paste0("pH ", sheet$pH1_std, " Post-Cal mV"), value = sheet$pH1_post_mV)
             updateNumericInput(session, "pH2_post_val", label = paste0("pH ", sheet$pH2_std, " Post-Cal Value"), value = sheet$pH2_post_val)
-            updateNumericInput(session, "pH2_post_mV", label = paste0("pH ", sheet$pH2_std, " Post-Cal mV"), value = sheet$pH2_post_mV)
             updateNumericInput(session, "pH3_post_val", label = paste0("pH ", sheet$pH3_std, " Post-Cal Value"), value = sheet$pH3_post_val)
-            updateNumericInput(session, "pH3_post_mV", label = paste0("pH ", sheet$pH3_std, " Post-Cal mV"), value = sheet$pH3_post_mV)
             shinyjs::show("delete_pH")
           } else if (i == "ORP"){
             output_name <- "ORP calibration"
@@ -1184,7 +1274,7 @@ app_server <- function(input, output, session) {
       restarted$restarted <- TRUE
       updateCheckboxInput(session, "spc_or_not", value = FALSE) #Reset to FALSE since values are stored as SpC; this makes it clear to the user.
     }
-  })
+  }, ignoreInit = TRUE)
 
   observeEvent(input$delete_calibration, {
     delete_value <- as.numeric(input$restart_index)
@@ -1193,18 +1283,16 @@ app_server <- function(input, output, session) {
     } else {
       shinyalert::shinyalert("Deleting old calibration", type = "info")
       delete_ID <- as.numeric(incomplete_observations[delete_value , 1])
-      calibration_data$next_id <- delete_ID
       calibration_sheets <- googlesheets4::sheet_names(calibrations_id)
       for (i in calibration_sheets){
         sheet <- googlesheets4::read_sheet(calibrations_id, sheet = i)
         sheet <- as.data.frame(sheet)
         if (i == "observations"){
-          observations <- sheet
-          observations <- observations[!observations$observation_ID == delete_value , ]
-          calibration_data$next_id <- max(observations$observation_ID) + 1
+          observations <- sheet[!sheet$observation_ID == delete_ID , ] #Used later to re-set the new observation_ID
         }
-        if (nrow(sheet[sheet$observation_ID == delete_ID , ]) == 1){
-          row <- which(sheet$observation_ID == calibration_data$next_id)+1
+        if (nrow(sheet[sheet$observation_ID == delete_ID , ]) == 1){ #Checks if there's a corresponding entry to the sheet, deletes if there is
+          row <- which(sheet$observation_ID == delete_ID)+1
+          print(row)
           googlesheets4::range_clear(calibrations_id, sheet = i,range = paste0(row, ":", row))
         }
       }
@@ -1236,10 +1324,11 @@ app_server <- function(input, output, session) {
         reset_do()
         reset_depth()
       }
+      calibration_data$next_id <- max(observations$observation_ID) + 1
       updateNumericInput(session, "restart_index", value = 0)
       shinyalert::shinyalert("Deleted", type = "success", immediate = TRUE, timer = 2000)
     }
-  })
+  }, ignoreInit = TRUE)
 
   observeEvent(input$spc_or_not, {
     if (input$spc_or_not){
@@ -1253,9 +1342,10 @@ app_server <- function(input, output, session) {
       updateNumericInput(session, "SpC2_pre", label = "SpC High-Range Pre-Cal Value")
       updateNumericInput(session, "SpC2_post", label = "SpC High-Range Post-Cal Value")
     }
-  })
+  }, ignoreInit = TRUE)
 
 
+  #Function to simplify DO calculated fields later on
   DO_calc <- function(pre_post, prct_abs, messages = TRUE){
     trigger_name <- if (pre_post == "pre" & prct_abs == "prct") "DO_pre_prct" else if (pre_post == "pre" & prct_abs == "abs") "DO_pre" else if (pre_post == "post" & prct_abs == "prct") "DO_post_prct" else if (pre_post == "post" & prct_abs == "abs") "DO_post"
     update_name <- if (pre_post == "pre" & prct_abs == "prct") "DO_pre" else if (pre_post == "pre" & prct_abs == "abs") "DO_pre_prct" else if (pre_post == "post" & prct_abs == "prct") "DO_post" else if (pre_post == "post" & prct_abs == "abs") "DO_post_prct"
@@ -1324,7 +1414,7 @@ app_server <- function(input, output, session) {
         updateCheckboxInput(session, "spc_or_not", value = FALSE)
       }
     }
-  })
+  }, ignoreInit = TRUE)
 
   validation_check$pH <- FALSE
   observeEvent(input$validate_pH, { #Deal with the pH page
@@ -1339,14 +1429,23 @@ app_server <- function(input, output, session) {
       if (std1 != 4){
         shinyjs::js$backgroundCol("pH1_std", "lemonchiffon")
         warn_ph_std <- TRUE
+      } else {
+        shinyjs::js$backgroundCol("pH1_std", "white")
+        warn_ph_std <- FALSE
       }
       if (std2 != 7){
         shinyjs::js$backgroundCol("pH2_std", "lemonchiffon")
         warn_ph_std <- TRUE
+      } else {
+        shinyjs::js$backgroundCol("pH2_std", "white")
+        warn_ph_std <- FALSE
       }
       if (std3 != 10){
         shinyjs::js$backgroundCol("pH3_std", "lemonchiffon")
         warn_ph_std <- TRUE
+      } else {
+        shinyjs::js$backgroundCol("pH3_std", "white")
+        warn_ph_std <- FALSE
       }
       #Validate the pH measurements vs the standards
       value1 <- as.numeric(input$pH1_post_val)
@@ -1371,32 +1470,32 @@ app_server <- function(input, output, session) {
         shinyjs::js$backgroundCol("pH3_post_val", "white")
       }
       # Validate the mV readings
-      pH1_mV <- as.numeric(input$pH1_post_mV)
-      pH2_mV <- as.numeric(input$pH2_post_mV)
-      pH3_mV <- as.numeric(input$pH3_post_mV)
-      if ((pH1_mV < (165 + pH2_mV)) | (pH1_mV > (180 + pH2_mV))   & (std1 > 3.9 & std1 < 4.1)){
-        shinyjs::js$backgroundCol("pH1_post_mV", "red")
+      pH1_mV <- as.numeric(input$pH1_mV)
+      pH2_mV <- as.numeric(input$pH2_mV)
+      pH3_mV <- as.numeric(input$pH3_mV)
+      if ((pH1_mV < (165 + pH2_mV)) | (pH1_mV > (180 + pH2_mV)) & (std1 > 3.9 & std1 < 4.1)){
+        shinyjs::js$backgroundCol("pH1__mV", "red")
         warn_mv_post <- TRUE
       } else if (std1 != 4){
-        shinyjs::js$backgroundCol("pH1_post_mV", "lemonchiffon")
+        shinyjs::js$backgroundCol("pH1_mV", "lemonchiffon")
       } else {
-        shinyjs::js$backgroundCol("pH1_post_mV", "white")
+        shinyjs::js$backgroundCol("pH1_mV", "white")
       }
       if ((pH2_mV > 50 | pH2_mV < -50) & (std2 > 6.9 & std2 < 7.1)){
-        shinyjs::js$backgroundCol("pH2_post_mV", "red")
+        shinyjs::js$backgroundCol("pH2_mV", "red")
         warn_mv_post <- TRUE
       } else if (std2 != 7){
-        shinyjs::js$backgroundCol("pH2_post_mV", "lemonchiffon")
+        shinyjs::js$backgroundCol("pH2_mV", "lemonchiffon")
       } else {
-        shinyjs::js$backgroundCol("pH2_post_mV", "white")
+        shinyjs::js$backgroundCol("pH2_mV", "white")
       }
-      if ((pH3_mV > (165 - pH2_mV)) | (pH3_mV < (180 - pH2_mV))   & (std3 > 9.9 & std3 < 10.1)){
-        shinyjs::js$backgroundCol("pH3_post_mV", "red")
+      if ((pH3_mV > (165 - pH2_mV)) | (pH3_mV < (180 - pH2_mV))& (std3 > 9.9 & std3 < 10.1)){
+        shinyjs::js$backgroundCol("pH3_mV", "red")
         warn_mv_post <- TRUE
       } else if (std3 != 10){
-        shinyjs::js$backgroundCol("pH3_post_mV", "lemonchiffon")
+        shinyjs::js$backgroundCol("pH3_mV", "lemonchiffon")
       } else {
-        shinyjs::js$backgroundCol("pH3_post_mV", "white")
+        shinyjs::js$backgroundCol("pH3_mV", "white")
       }
       #TODO: chain these shinyalerts together
       if (warn_ph_std){
@@ -1412,7 +1511,8 @@ app_server <- function(input, output, session) {
     }, error = function(e) {
       shinyalert::shinyalert(title = "You have unfilled mandatory entries", text = "If doing a 2-point calibration enter 0 for the third solution values to pass this check.", type = "error")
     })
-  })
+  }, ignoreInit = TRUE)
+
   validation_check$orp <- FALSE
   observeEvent(input$validate_orp, { #Deal with the temp page
     tryCatch({
@@ -1434,7 +1534,8 @@ app_server <- function(input, output, session) {
     }, error = function(e) {
       shinyalert::shinyalert(title = "You have unfilled mandatory entries", type = "error", timer = 2000)
     })
-  })
+  }, ignoreInit = TRUE)
+
   validation_check$temp <- FALSE
   observeEvent(input$validate_temp, { #Deal with the temp page
     tryCatch({
@@ -1459,9 +1560,9 @@ app_server <- function(input, output, session) {
     }, error = function(e) {
       shinyalert::shinyalert(title = "You have unfilled mandatory entries", type = "error", timer = 2000)
     })
-  })
-  validation_check$SpC <- FALSE
+  }, ignoreInit = TRUE)
 
+  validation_check$SpC <- FALSE
   observeEvent(input$validate_SpC, { #Deal with SpC
     if (input$spc_or_not & is.null(calibration_data$temp)){
       shinyalert::shinyalert("Calibrate temperature first!", "You must calibrate temperature first if entering non-specific conductivity")
@@ -1493,6 +1594,8 @@ app_server <- function(input, output, session) {
           }
         } else {
           gtg1 <- TRUE
+          shinyjs::js$backgroundCol("SpC1_std", "white")
+          shinyjs::js$backgroundCol("SpC1_post", "white")
         }
         if (SpC2_diff > 10){
           shinyjs::js$backgroundCol("SpC2_std", "red")
@@ -1513,6 +1616,8 @@ app_server <- function(input, output, session) {
           }
         } else {
           gtg2 <- TRUE
+          shinyjs::js$backgroundCol("SpC2_std", "white")
+          shinyjs::js$backgroundCol("SpC2_post", "white")
         }
         if (gtg1 & gtg2){
           shinyalert::shinyalert(title = "Good to go!", type = "success", timer = 2000)
@@ -1522,7 +1627,8 @@ app_server <- function(input, output, session) {
         shinyalert::shinyalert(title = "You have unfilled mandatory entries", type = "error", timer = 2000)
       })
     }
-  })
+  }, ignoreInit = TRUE)
+
   validation_check$turb <- FALSE
   observeEvent(input$validate_turb, { #Deal with turbidity
     tryCatch({
@@ -1565,7 +1671,8 @@ app_server <- function(input, output, session) {
     }, error = function(e) {
       shinyalert::shinyalert(title = "You have unfilled mandatory entries", type = "error", timer = 2000)
     })
-  })
+  }, ignoreInit = TRUE)
+
   validation_check$DO <- FALSE
   observeEvent(input$validate_DO, { #Deal with DO
     NFG <- FALSE
@@ -1589,7 +1696,7 @@ app_server <- function(input, output, session) {
     }, error = function(e) {
       shinyalert::shinyalert(title = "You have unfilled mandatory entries", "Baro pressure and DO in mg/l are mandatory", type = "error", timer = 4000)
     })
-  })
+  }, ignoreInit = TRUE)
 
   validation_check$depth <- FALSE
   observeEvent(input$validate_depth, { #Deal with depth
@@ -1605,7 +1712,7 @@ app_server <- function(input, output, session) {
     }, error = function(e) {
       shinyalert::shinyalert(title = "You have unfilled mandatory entries", type = "error", timer = 2000)
     })
-  })
+  }, ignoreInit = TRUE)
 
   observeEvent(input$selection, {
     if (input$selection == "Basic calibration info"){
@@ -1616,7 +1723,7 @@ app_server <- function(input, output, session) {
     } else {
       shinyjs::hide("calibration_instruments_table")
     }
-  })
+  }, ignoreInit = TRUE)
 
   ### Save basic info
   observeEvent(input$save_basic_info, {
@@ -1664,7 +1771,7 @@ app_server <- function(input, output, session) {
         send_table$saved
       })
     }
-  })
+  }, ignoreInit = TRUE)
 
   ### Save/Delete pH
   observeEvent(input$save_cal_pH, {
@@ -1672,20 +1779,17 @@ app_server <- function(input, output, session) {
       shinyalert::shinyalert(title = "Saving...", type = "info")
       calibration_data$pH <- data.frame(observation_ID = calibration_data$next_id,
                                         pH1_std = input$pH1_std,
-                                        pH1_pre_val = input$pH1_pre_val,
-                                        pH1_pre_mV = input$pH1_pre_mV,
-                                        pH1_post_val = input$pH1_post_val,
-                                        pH1_post_mV = input$pH1_post_mV,
                                         pH2_std = input$pH2_std,
-                                        pH2_pre_val = input$pH2_pre_val,
-                                        pH2_pre_mV = input$pH2_pre_mV,
-                                        pH2_post_val = input$pH2_post_val,
-                                        pH2_post_mV = input$pH2_post_mV,
                                         pH3_std = input$pH3_std,
+                                        pH1_pre_val = input$pH1_pre_val,
+                                        pH2_pre_val = input$pH2_pre_val,
                                         pH3_pre_val = input$pH3_pre_val,
-                                        pH3_pre_mV = input$pH3_pre_mV,
-                                        pH3_post_val = input$pH3_post_val,
-                                        pH3_post_mV = input$pH3_post_mV)
+                                        pH1_mV = input$pH1_mV,
+                                        pH2_mV = input$pH2_mV,
+                                        pH3_mV = input$pH3_mV,
+                                        pH1_post_val = input$pH1_post_val,
+                                        pH2_post_val = input$pH2_post_val,
+                                        pH3_post_val = input$pH3_post_val)
       if (!complete$pH){
         googlesheets4::sheet_append(calibrations_id, sheet="pH", data = calibration_data$pH)
         complete$pH <- TRUE
@@ -1724,7 +1828,8 @@ app_server <- function(input, output, session) {
     } else {
       shinyalert::shinyalert(title = "Validate your measurements first!", type = "error", timer = 2000)
     }
-  })
+  }, ignoreInit = TRUE)
+
   observeEvent(input$delete_pH, {
     shinyalert::shinyalert("Deleting...", type = "info")
     #delete on remote sheet
@@ -1752,7 +1857,7 @@ app_server <- function(input, output, session) {
       send_table$restarted_cal
     })
     complete$pH <- FALSE
-  })
+  }, ignoreInit = TRUE)
 
   ### Save/Delete temperature
   observeEvent(input$save_cal_temp, {
@@ -1800,7 +1905,8 @@ app_server <- function(input, output, session) {
     } else {
       shinyalert::shinyalert(title = "Validate your measurements first!", type = "error", timer = 2000)
     }
-  })
+  }, ignoreInit = TRUE)
+
   observeEvent(input$delete_temp, {
     shinyalert::shinyalert("Deleting...", type = "info")
     temp_sheet <- googlesheets4::read_sheet(calibrations_id, sheet = "temperature")
@@ -1827,7 +1933,7 @@ app_server <- function(input, output, session) {
       send_table$restarted_cal
     })
     complete$temperature <- FALSE
-  })
+  }, ignoreInit = TRUE)
 
   ### Save/Delete ORP
   observeEvent(input$save_cal_orp, {
@@ -1875,7 +1981,7 @@ app_server <- function(input, output, session) {
     } else {
       shinyalert::shinyalert(title = "Validate your measurements first!", type = "error", timer = 2000)
     }
-  })
+  }, ignoreInit = TRUE)
   observeEvent(input$delete_orp, {
     shinyalert::shinyalert("Deleting...", type = "info")
     orp_sheet <- googlesheets4::read_sheet(calibrations_id, sheet = "ORP")
@@ -1902,7 +2008,7 @@ app_server <- function(input, output, session) {
       send_table$restarted_cal
     })
     complete$orp <- FALSE
-  })
+  }, ignoreInit = TRUE)
 
   ### Save/Delete SpC
   observeEvent(input$save_cal_SpC, {
@@ -1957,7 +2063,7 @@ app_server <- function(input, output, session) {
         shinyalert::shinyalert(title = "Validate your measurements first!", type = "error", timer = 2000)
       }
     }
-  })
+  }, ignoreInit = TRUE)
   observeEvent(input$delete_SpC, {
     shinyalert::shinyalert("Deleting...", type = "info")
     SpC_sheet <- googlesheets4::read_sheet(calibrations_id, sheet = "SpC")
@@ -1984,7 +2090,7 @@ app_server <- function(input, output, session) {
       send_table$restarted_cal
     })
     complete$SpC <- FALSE
-  })
+  }, ignoreInit = TRUE)
 
   ### Save/Delete turbidity
   observeEvent(input$save_cal_turb, {
@@ -2035,7 +2141,7 @@ app_server <- function(input, output, session) {
     } else {
       shinyalert::shinyalert(title = "Validate your measurements first!", type = "error", timer = 2000)
     }
-  })
+  }, ignoreInit = TRUE)
   observeEvent(input$delete_turb, {
     shinyalert::shinyalert("Deleting...", type = "info")
     turb_sheet <- googlesheets4::read_sheet(calibrations_id, sheet = "turbidity")
@@ -2062,7 +2168,7 @@ app_server <- function(input, output, session) {
       send_table$restarted_cal
     })
     complete$turbidity <- FALSE
-  })
+  }, ignoreInit = TRUE)
 
   ### Save/Delete DO
   observeEvent(input$save_cal_DO, {
@@ -2111,7 +2217,7 @@ app_server <- function(input, output, session) {
     } else {
       shinyalert::shinyalert(title = "Validate your measurements first!", type = "error", timer = 2000)
     }
-  })
+  }, ignoreInit = TRUE)
   observeEvent(input$delete_DO, {
     shinyalert::shinyalert("Deleting...", type = "info")
     DO_sheet <- googlesheets4::read_sheet(calibrations_id, sheet = "DO")
@@ -2138,7 +2244,7 @@ app_server <- function(input, output, session) {
       send_table$restarted_cal
     })
     complete$DO <- FALSE
-  })
+  }, ignoreInit = TRUE)
 
   ### Save/Delete depth
   observeEvent(input$save_cal_depth, {
@@ -2185,7 +2291,7 @@ app_server <- function(input, output, session) {
     } else {
       shinyalert::shinyalert(title = "Validate your measurements first!", type = "error", timer = 2000)
     }
-  })
+  }, ignoreInit = TRUE)
   observeEvent(input$delete_depth, {
     shinyalert::shinyalert("Deleting...", type = "info")
     depth_sheet <- googlesheets4::read_sheet(calibrations_id, sheet = "depth")
@@ -2212,7 +2318,7 @@ app_server <- function(input, output, session) {
       send_table$restarted_cal
     })
     complete$depth <- FALSE
-  })
+  }, ignoreInit = TRUE)
 
 
   observeEvent({input$submit_btn}, {
@@ -2272,5 +2378,5 @@ app_server <- function(input, output, session) {
                              } #end of callbackR
       )
     }
-  })
+  }, ignoreInit = TRUE)
 }

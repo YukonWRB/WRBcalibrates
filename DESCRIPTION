@@ -1,6 +1,6 @@
 Package: WRBcalibrates
 Title: WRB calibration app
-Version: 0.0.0.9000
+Version: 1.0.0
 Authors@R: 
     person("Ghislain", "de Laplante", , "ghislain.delaplante@yukon.ca", role = c("cre", "aut"))
 Description: App to save instrument calibration data.
@@ -16,6 +16,7 @@ Imports:
     googlesheets4,
     lifecycle,
     magrittr,
+    respR,
     RSQLite,
     shiny,
     shinyalert,
