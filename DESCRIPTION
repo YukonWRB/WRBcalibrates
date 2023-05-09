@@ -1,6 +1,6 @@
 Package: WRBcalibrates
 Title: WRB calibration app
-Version: 1.0.0
+Version: 1.1.0
 Authors@R: 
     person("Ghislain", "de Laplante", , "ghislain.delaplante@yukon.ca", role = c("cre", "aut"))
 Description: App to save instrument calibration data.
@@ -12,7 +12,6 @@ Imports:
     DBI,
     DT,
     golem,
-    googledrive,
     googlesheets4,
     lifecycle,
     magrittr,
@@ -21,7 +20,8 @@ Imports:
     shiny,
     shinyalert,
     shinyjs,
-    shinyWidgets
+    shinyWidgets,
+    stringr
 Suggests: 
     spelling,
     testthat (>= 3.0.0)

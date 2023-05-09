@@ -6,67 +6,16 @@
 #' @noRd
 app_server <- function(input, output, session) {
 
-  shinyalert::shinyalert("Loading data...", type = "info", timer = 4000)
-
-  #Authenticate and fetch from Google. While loop is in case it's too slow or yields a connection error, which happens sometimes.
-  max_retries <- 5
-  retry_count <- 0
-  alert_shown <- FALSE
-  while (retry_count < max_retries){
+  use_database <- FALSE
+  if (use_database){
     tryCatch({
-      # googlesheets4::gs4_auth(cache = ".secrets") #Run locally FIRST TIME ONLY to allow the email to work
-      # googledrive::drive_auth(cache = ".secrets") #Run locally FIRST TIME ONLY to allow the email to work
-      googlesheets4::gs4_auth(cache = ".secrets", email = TRUE, use_oob = TRUE) #Run after the above two lines are run once.
-      # googledrive::drive_auth(cache = ".secrets", email = TRUE, use_oob = TRUE) #Run after the above two lines are run once. Not necessary unless googledrive is used to retrieve the workbook id
-
-      # # Saved code to allow only one editing user at a time.
-      # # users_id <- googledrive::drive_get("calibrations/users")$id #not necessary unless/until the id changes (a bit slow)
-      # users_id <- "1MTKlsN0G9Sembf6R1ICDS1UmwOe6hvVbHT_kPh5b7oA"
-      # users <- googlesheets4::read_sheet(users_id, sheet = "users")
-      # users <- as.data.frame(users)
-      # if (users[nrow(users), "open"] == TRUE){
-      #   #check the start_time. More than a half hour ago? Probably from a crashed instance.
-      #
-      # } else { #lock things down until finished
-      #   googlesheets4::sheet_append(users_id,
-      #                               data = data.frame("con_num" = users[nrow(users), "con_num"] + 1,
-      #                                                             "start_time" = as.character(.POSIXct(Sys.time(), tz = "MST")),
-      #                                                             "open" = TRUE),
-      #                               sheet = "users")
-      #   onStop(function(){
-      #     googlesheets4::range_write(users_id, data = data.frame("open" = FALSE), sheet = "users", range = paste0("C", nrow(users) +2), col_names = FALSE)
-      #     Sys.sleep(5)
-      #     cat("onStop ran")
-      #   })
-      # }
-
-
-      # calibrations_id <- googledrive::drive_get("calibrations/calibrations")$id #not necessary unless/until the id changes (a bit slow)
-      calibrations_id <- "1X-5-wJRM5Q5QRBya88Pia2YW7tiVwggozQMWHzpCIZQ"
-      # instruments_id <- googledrive::drive_get("calibrations/instruments")$id #not necessary unless/until the id changes
-      instruments_id <- "16OSB9PJnRzuiizBnH-I1QcXXMlIdE0D1v5pb5JnmTNE"
-      # sensors_id <- googledrive::drive_get("calibrations/sensors")$id #not necessary unless/until the id changes
-      sensors_id <- "15olKuoTKhDvEMzgkNAlMDLdF1DnJn0pQBX6CuArY-ls"
-      instruments_sheet <- googlesheets4::read_sheet(instruments_id, sheet = "instruments")
-      instruments_sheet <- as.data.frame(instruments_sheet)
-      if (alert_shown){
-        shinyalert::shinyalert("Success!", immediate = true, timer = 2000)
-      }
-      break
+      DB_con <- calConnect(path = "G:\\water\\Common_GW_SW\\Data\\calibrations\\WRBcalibrates.sqlite", silent = TRUE)
     }, error = function(e) {
-      alert_shown <- TRUE
-      shinyalert::shinyalert("Connection difficulties...", paste0("Attempt ", retry_count+1, " of ", max_retries), type = "error", immediate = TRUE)
-      retry_count <<- retry_count + 1
-      Sys.sleep(2)
+      shinyalert::shinyalert("Connection failure", "Connection to SQL database failed")
+      Sys.sleep(3)
+      stopApp()
     })
   }
-  if (retry_count == max_retries){
-    shinyalert::shinyalert("Failed to connect to remote data", "Try again in a few minutes.", type = "error")
-    Sys.sleep(3)
-    stopApp()
-  }
-
-
 
   # create a few containers
   validation_check <- reactiveValues()
@@ -89,6 +38,69 @@ app_server <- function(input, output, session) {
   complete$DO <- FALSE
   complete$depth <- FALSE
   reset_check <- reactiveValues(sensors = FALSE)
+
+  if (!use_database){
+    shinyalert::shinyalert("Loading data...", type = "info", timer = 4000)
+    #Authenticate and fetch from Google. While loop is in case it's too slow or yields a connection error, which happens sometimes.
+    max_retries <- 5
+    retry_count <- 0
+    alert_shown <- FALSE
+    while (retry_count < max_retries){
+      tryCatch({
+        # googlesheets4::gs4_auth(cache = ".secrets") #Run locally FIRST TIME ONLY to allow the email to work. A secret file will be saved.
+        # googledrive::drive_auth(cache = ".secrets") #Run locally FIRST TIME ONLY to allow the email to work. A secret file will be saved.
+        googlesheets4::gs4_auth(cache = ".secrets", email = TRUE, use_oob = TRUE) #Run after the above two lines are run once.
+        # googledrive::drive_auth(cache = ".secrets", email = TRUE, use_oob = TRUE) #Run after the above two lines are run once. Not necessary unless googledrive is used to retrieve the workbook id, but these are hard-coded below.
+
+        # calibrations_id <- googledrive::drive_get("calibrations/calibrations")$id #not necessary unless/until the id changes (a bit slow)
+        calibrations_id <- "1X-5-wJRM5Q5QRBya88Pia2YW7tiVwggozQMWHzpCIZQ"
+        # instruments_id <- googledrive::drive_get("calibrations/instruments")$id #not necessary unless/until the id changes
+        instruments_id <- "16OSB9PJnRzuiizBnH-I1QcXXMlIdE0D1v5pb5JnmTNE"
+        # sensors_id <- googledrive::drive_get("calibrations/sensors")$id #not necessary unless/until the id changes
+        sensors_id <- "15olKuoTKhDvEMzgkNAlMDLdF1DnJn0pQBX6CuArY-ls"
+        instruments_sheet <- googlesheets4::read_sheet(instruments_id, sheet = "instruments")
+        instruments_sheet <- as.data.frame(instruments_sheet)
+
+        # query the observations sheet for increment number and unfinished calibrations
+        observations <- googlesheets4::read_sheet(calibrations_id, sheet = "observations")
+        observations <- as.data.frame(observations)
+
+        if (alert_shown){
+          shinyalert::shinyalert("Success!", immediate = TRUE, timer = 2000)
+        }
+        break
+      }, error = function(e) {
+        alert_shown <- TRUE
+        shinyalert::shinyalert("Connection difficulties...", paste0("Attempt ", retry_count+1, " of ", max_retries), type = "error", immediate = TRUE)
+        retry_count <<- retry_count + 1
+        Sys.sleep(2)
+      })
+    }
+    if (retry_count == max_retries){
+      shinyalert::shinyalert("Failed to connect to remote data", "Try again in a few minutes.", type = "error")
+      Sys.sleep(3)
+      stopApp()
+    }
+  } else { #Using the SQL database. Connection is made near the top of this script.
+    instruments_sheet <- DBI::dbReadTable(DB_con, "instruments")
+    observations <- DBI::dbReadTable(DB_con, "observations")
+  }
+
+  calibration_data$next_id <- max(observations$observation_ID) + 1  # find out the new observation ID number
+  incomplete_observations <- observations[(observations$complete == FALSE | observations$complete == 0) , ] # find out if any calibrations are labelled as incomplete
+  if (nrow(incomplete_observations) > 0){
+    shinyalert::shinyalert(title = "Incomplete calibrations found!", text = "Go to to the page 'View unfinished calibrations' to restart or delete them.")
+    complete$incomplete <- data.frame("Index" = seq(1, nrow(incomplete_observations)),
+                                      "Calibrator" = as.vector(incomplete_observations$observer),
+                                      "Date/time" = as.character(incomplete_observations$obs_datetime),
+                                      check.names = FALSE)
+  } else {
+    # Make a data.frame with no calibrations
+    complete$incomplete <- data.frame("Index" = "0",
+                                      "Calibrator" = "No unsaved calibrations!",
+                                      "Date/Time" = "No unsaved calibrations!",
+                                      check.names = FALSE)
+  }
 
   # Hide a bunch of buttons until they can be used
   # Delete buttons to remove a calibration sheet
@@ -306,27 +318,6 @@ app_server <- function(input, output, session) {
       updateSelectizeInput(session, "ID_handheld_meter", choices = c("NA", instruments_data$handhelds$serial_no))
   })
 
-  # query the observations sheet for increment number and unfinished calibrations
-  observations <- googlesheets4::read_sheet(calibrations_id, sheet = "observations")
-  observations <- as.data.frame(observations)
-  calibration_data$next_id <- max(observations$observation_ID) + 1  # find out the new observation ID number
-
-  # find out if any calibrations are labelled as incomplete
-  incomplete_observations <- observations[observations$complete == FALSE,]
-  if (nrow(incomplete_observations) > 0){
-    shinyalert::shinyalert(title = "Incomplete calibrations found!", text = "Go to to the page 'View unfinished calibrations' to restart or delete them.")
-    complete$incomplete <- data.frame("Index" = seq(1, nrow(incomplete_observations)),
-                                        "Calibrator" = as.vector(incomplete_observations$observer),
-                                        "Date/time" = as.character(incomplete_observations$obs_datetime),
-                                        check.names = FALSE)
-  } else {
-    # Make a data.frame with no calibrations
-    complete$incomplete <- data.frame("Index" = "0",
-                                      "Calibrator" = "No unsaved calibrations!",
-                                      "Date/Time" = "No unsaved calibrations!",
-                                      check.names = FALSE)
-  }
-
   observeEvent(input$pH1_std, {
     updateNumericInput(session, "pH1_pre_val", label = paste0("pH ", input$pH1_std, " Pre-Cal Value"))
     updateNumericInput(session, "pH1_mV", label = paste0("pH ", input$pH1_std, " mV"))
@@ -408,8 +399,12 @@ app_server <- function(input, output, session) {
       shinyjs::hide("add.change_sensor.comment")
       shinyjs::show("load_sensors")
       if (is.null(sensors_data$sensors)){
-        sensors_sheet <- googlesheets4::read_sheet(sensors_id, sheet = "sensors") #Load the sensor sheet for when the user hits the load_sensors button
-        sensors_sheet <- as.data.frame(sensors_sheet)
+        if (use_database){
+          sensors_sheet <- DBI::dbReadTable(DB_con, "sensors")
+        } else {
+          sensors_sheet <- googlesheets4::read_sheet(sensors_id, sheet = "sensors") #Load the sensor sheet for when the user hits the load_sensors button
+          sensors_sheet <- as.data.frame(sensors_sheet)
+        }
         sensors_data$sensors <- sensors_sheet #assign to a reactive
       }
     } else if (input$first_selection == "Calibrate"){
@@ -568,17 +563,24 @@ app_server <- function(input, output, session) {
     run_else <- TRUE
     if (sensors_data$datetime_exists){ #adding to an existing line
       if (sensors_data$sensor[sensors_data$sensor$obs_datetime == sensors_data$datetime, "instrument_ID"] == sensors_data$instrument_ID) {
-        #find the row number for that observation
-        row <- which(sensors_data$sensors$obs_datetime == sensors_data$datetime & sensors_data$sensors$instrument_ID == sensors_data$instrument_ID)+1
-        col_type <- which(colnames(sensors_data$sensors) == paste0("sensor", sensors_data$number + 1, "_type"))
-        col_type_letter <- stringr::str_to_upper(letters[col_type])
-        col_comment <- which(colnames(sensors_data$sensors) == paste0("sensor", sensors_data$number + 1, "_notes"))
-        col_comment_letter <- stringr::str_to_upper(letters[col_comment])
-        col_serial <- which(colnames(sensors_data$sensors) == paste0("sensor", sensors_data$number + 1, "_serial"))
-        col_serial_letter <- stringr::str_to_upper(letters[col_serial])
-        googlesheets4::range_write(sensors_id, sheet = "sensors", data = data.frame("type" = input$add_sensor_dropdown), range = paste0(col_type_letter, row) , col_names = FALSE, reformat = FALSE)
-        googlesheets4::range_write(sensors_id, sheet = "sensors", data = data.frame("note" = comment), range = paste0(col_comment_letter, row) , col_names = FALSE, reformat = FALSE)
-        googlesheets4::range_write(sensors_id, sheet = "sensors", data = data.frame("serial" = as.character(input$new_sensor_serial)), range = paste0(col_serial_letter, row) , col_names = FALSE, reformat = FALSE)
+        if (use_database){
+          col_type <- paste0("sensor", sensors_data$number + 1, "_type")
+          col_comment <- paste0("sensor", sensors_data$number + 1, "_notes")
+          col_serial <- paste0("sensor", sensors_data$number + 1, "_serial")
+          DBI::dbExecute(DB_con, paste0("UPDATE sensors SET ", col_type, " = '", input$add_sensor_dropdown, "', ", col_comment, " = '", comment, "', ", col_serial, " = '", as.character(input$new_sensor_serial), "' WHERE obs_datetime = '", sensors_data$datetime, "'"))
+        } else {
+          #find the row number for that observation
+          row <- which(sensors_data$sensors$obs_datetime == sensors_data$datetime & sensors_data$sensors$instrument_ID == sensors_data$instrument_ID)+1
+          col_type <- which(colnames(sensors_data$sensors) == paste0("sensor", sensors_data$number + 1, "_type"))
+          col_comment <- which(colnames(sensors_data$sensors) == paste0("sensor", sensors_data$number + 1, "_notes"))
+          col_serial <- which(colnames(sensors_data$sensors) == paste0("sensor", sensors_data$number + 1, "_serial"))
+          col_type_letter <- stringr::str_to_upper(letters[col_type])
+          col_comment_letter <- stringr::str_to_upper(letters[col_comment])
+          col_serial_letter <- stringr::str_to_upper(letters[col_serial])
+          googlesheets4::range_write(sensors_id, sheet = "sensors", data = data.frame("type" = input$add_sensor_dropdown), range = paste0(col_type_letter, row) , col_names = FALSE, reformat = FALSE)
+          googlesheets4::range_write(sensors_id, sheet = "sensors", data = data.frame("note" = comment), range = paste0(col_comment_letter, row) , col_names = FALSE, reformat = FALSE)
+          googlesheets4::range_write(sensors_id, sheet = "sensors", data = data.frame("serial" = as.character(input$new_sensor_serial)), range = paste0(col_serial_letter, row) , col_names = FALSE, reformat = FALSE)
+        }
 
         #Append to the internal df to not have to read-in again
         type_col <- paste0("sensor", sensors_data$number + 1, "_type")
@@ -596,7 +598,7 @@ app_server <- function(input, output, session) {
         run_else <- FALSE
       }
     }
-    if (run_else) { #append to sensors_id
+    if (run_else) { #append to sensors with new row
       df <- data.frame("instrument_ID" = sensors_data$instrument_ID,
                        "observer" = input$add_sensor_name,
                        "obs_datetime" = sensors_data$datetime,
@@ -627,7 +629,11 @@ app_server <- function(input, output, session) {
       df[1, paste0("sensor", sensors_data$number + 1, "_type")] <- input$add_sensor_dropdown
       df[1, paste0("sensor", sensors_data$number + 1, "_notes")] <- comment
       df[1, paste0("sensor", sensors_data$number + 1, "_serial")] <- as.character(input$new_sensor_serial)
-      googlesheets4::sheet_append(sensors_id, sheet = "sensors", data = df)
+      if (use_database){
+        DBI::dbAppendTable(DB_con, "sensors", df)
+      } else {
+        googlesheets4::sheet_append(sensors_id, sheet = "sensors", data = df)
+      }
 
       #Append to the internal dfs to not have to read-in again
       type_col <- paste0("sensor", sensors_data$number + 1, "_type")
@@ -976,23 +982,30 @@ app_server <- function(input, output, session) {
   }, ignoreInit = TRUE)
 
   observeEvent(input$add.change_sensor.comment, {
-    if (nchar(input$add.change_sensor.comment_name) <= 2 & nchar(input$add_comment) < 5){
+    if (nchar(input$add.change_sensor.comment_name) < 2 & nchar(input$add_comment) < 5){
       shinyalert::shinyalert("Please fill in all fields!", type = "error", timer = 3000)
     } else { #add the data
       run_else <- TRUE
       if (sensors_data$datetime_exists){
         if (sensors_data$sensor[sensors_data$sensor$obs_datetime == sensors_data$datetime, "instrument_ID"] == sensors_data$instrument_ID){
-          #find the row number for that observation
-          row <- which(sensors_data$sensors$obs_datetime == sensors_data$datetime & sensors_data$sensors$instrument_ID == sensors_data$instrument_ID)+1
-          col_type <- which(colnames(sensors_data$sensors) == paste0(sensors_data$selected, "_type"))
-          col_type_letter <- stringr::str_to_upper(letters[col_type])
-          col_comment <- which(colnames(sensors_data$sensors) == paste0(sensors_data$selected, "_notes"))
-          col_comment_letter <- stringr::str_to_upper(letters[col_comment])
-          col_serial <- which(colnames(sensors_data$sensors) == paste0(sensors_data$selected, "_serial"))
-          col_serial_letter <- stringr::str_to_upper(letters[col_serial])
-          googlesheets4::range_write(sensors_id, sheet = "sensors", data = data.frame("type" = input$change_sensor), range = paste0(col_type_letter, row) , col_names = FALSE, reformat = FALSE)
-          googlesheets4::range_write(sensors_id, sheet = "sensors", data = data.frame("note" = input$add_comment), range = paste0(col_comment_letter, row) , col_names = FALSE, reformat = FALSE)
-          googlesheets4::range_write(sensors_id, sheet = "sensors", data = data.frame("serial" = as.character(input$add_sensor_serial)), range = paste0(col_serial_letter, row) , col_names = FALSE, reformat = FALSE)
+          col_type <- paste0(sensors_data$selected, "_type")
+          col_comment <- paste0(sensors_data$selected, "_notes")
+          col_serial <- paste0(sensors_data$selected, "_serial")
+          if (use_database){
+            DBI::dbExecute(DB_con, paste0("UPDATE sensors SET ", col_type, " = '", input$change_sensor, "', ", col_comment, " = '", input$add_comment, "', ", col_serial, " = '", as.character(input$add_sensor_serial), "' WHERE obs_datetime = '", sensors_data$datetime, "'"))
+          } else {
+            #find the row number for that observation
+            row <- which(sensors_data$sensors$obs_datetime == sensors_data$datetime & sensors_data$sensors$instrument_ID == sensors_data$instrument_ID)+1
+            col_type <- which(colnames(sensors_data$sensors) == paste0(sensors_data$selected, "_type"))
+            col_comment <- which(colnames(sensors_data$sensors) == paste0(sensors_data$selected, "_notes"))
+            col_serial <- which(colnames(sensors_data$sensors) == paste0(sensors_data$selected, "_serial"))
+            col_type_letter <- stringr::str_to_upper(letters[col_type])
+            col_comment_letter <- stringr::str_to_upper(letters[col_comment])
+            col_serial_letter <- stringr::str_to_upper(letters[col_serial])
+            googlesheets4::range_write(sensors_id, sheet = "sensors", data = data.frame("type" = input$change_sensor), range = paste0(col_type_letter, row) , col_names = FALSE, reformat = FALSE)
+            googlesheets4::range_write(sensors_id, sheet = "sensors", data = data.frame("note" = input$add_comment), range = paste0(col_comment_letter, row) , col_names = FALSE, reformat = FALSE)
+            googlesheets4::range_write(sensors_id, sheet = "sensors", data = data.frame("serial" = as.character(input$add_sensor_serial)), range = paste0(col_serial_letter, row) , col_names = FALSE, reformat = FALSE)
+          }
 
           #Append to the internal df to not have to read-in again
           type_col <- paste0(sensors_data$selected, "_type")
@@ -1038,7 +1051,11 @@ app_server <- function(input, output, session) {
         df[1, paste0(sensors_data$selected, "_type")] <- input$change_sensor
         df[1, paste0(sensors_data$selected, "_notes")] <- input$add_comment
         df[1, paste0(sensors_data$selected, "_serial")] <- as.character(input$add_sensor_serial)
-        googlesheets4::sheet_append(sensors_id, sheet = "sensors", data = df)
+        if (use_database){
+          DBI::dbAppendTable(DB_con, "sensors", df)
+        } else {
+          googlesheets4::sheet_append(sensors_id, sheet = "sensors", data = df)
+        }
 
         #Append to the internal df to not have to read-in again
         sensors_data$sensor <- merge(sensors_data$sensor, df, all = TRUE, sort = FALSE)
@@ -1110,45 +1127,71 @@ app_server <- function(input, output, session) {
       } else { #Make a new entry
         instrument.df <- data.frame(instrument_ID = new_id,
                                     observer = input$recorder,
-                                    obs_datetime = as.character(Sys.time()),
+                                    obs_datetime = as.character(.POSIXct(Sys.time(), tz = "MST")),
                                     make = input$make,
                                     model = input$model,
                                     type = input$type,
                                     serial_no = gsub("[^[:alnum:]]", "", input$serial_no),
                                     asset_tag = gsub("[^[:alnum:]]", "", input$asset_tag),
-                                    date_in_service = if (length(input$date_in_service) == 0) NA else as.character(input$date_in_service),
-                                    date_purchased = if (length(input$date_purchased) == 0) NA else as.character(input$date_purchased),
+                                    date_in_service = if (length(input$date_in_service) < 5) NA else as.character(input$date_in_service),
+                                    date_purchased = if (length(input$date_purchased) < 5) NA else as.character(input$date_purchased),
                                     retired_by = input$retired_by,
-                                    date_retired = if (length(input$date_retired) == 0) NA else as.character(input$date_retired))
-        googlesheets4::sheet_append(instruments_id, sheet = "instruments", data = instrument.df)
+                                    date_retired = if (length(input$date_retired) < 5) NA else as.character(input$date_retired))
+        if (use_database){
+          DBI::dbAppendTable(DB_con, "instruments", instrument.df)
+        } else {
+          googlesheets4::sheet_append(instruments_id, sheet = "instruments", data = instrument.df)
+        }
+
         shinyalert::shinyalert(paste0("Serial number ", input$serial_no, " added"), type = "success", timer = 2000)
         new_entry <- TRUE
       }
     } else { #Modify an existing entry
-      #find the row number for the existing observation
-      instruments_data$sheet
-      row <- which(instruments_data$sheet$serial_no == input$serial_no)+1
+      row <- which(instruments_data$sheet$serial_no == input$existing_serial_no)+1
       exist_id <- instruments_data$sheet[row-1, "instrument_ID"]
       instrument.df <- data.frame(instrument_ID = exist_id,
                                   observer = input$recorder,
-                                  obs_datetime = as.character(Sys.time()),
+                                  obs_datetime = as.character(.POSIXct(Sys.time(), tz = "MST")),
                                   make = input$make,
                                   model = input$model,
                                   type = input$type,
-                                  serial_no = gsub("[^[:alnum:]]", "", input$serial_no),
+                                  serial_no = gsub("[^[:alnum:]]", "", input$existing_serial_no),
                                   asset_tag = gsub("[^[:alnum:]]", "", input$asset_tag),
-                                  date_in_service = if (length(input$date_in_service) == 0) NA else as.character(input$date_in_service),
-                                  date_purchased = if (length(input$date_purchased) == 0) NA else as.character(input$date_purchased),
+                                  date_in_service = if (length(input$date_in_service) < 5) NA else as.character(input$date_in_service),
+                                  date_purchased = if (length(input$date_purchased) < 5) NA else as.character(input$date_purchased),
                                   retired_by = input$retired_by,
-                                  date_retired = if (length(input$date_retired) == 0) NA else as.character(input$date_retired))
-      googlesheets4::range_write(instruments_id, sheet = "instruments", data = instrument.df, range = paste0(row, ":", row) , col_names = FALSE, reformat = FALSE)
+                                  date_retired = if (length(input$date_retired) < 5) NA else as.character(input$date_retired))
+      if (use_database){
+        DBI::dbExecute(DB_con, paste0("UPDATE instruments SET observer = '", input$recorder,
+                                      "', obs_datetime = '", as.character(.POSIXct(Sys.time(), tz = "MST")),
+                                      "', make = '", input$make,
+                                      "', model = '", input$model,
+                                      "', type = '", input$type,
+                                      "', asset_tag = '", gsub("[^[:alnum:]]", "", input$asset_tag),
+                                      "', date_in_service = '", if (length(input$date_in_service) < 5) NA else as.character(input$date_in_service),
+                                      "', date_purchased = '", if (length(input$date_purchased) < 5) NA else as.character(input$date_purchased),
+                                      "', retired_by = '", input$retired_by,
+                                      "', date_retired = '", if (length(input$date_retired) < 5) NA else as.character(input$date_retired),
+                                      "' WHERE serial_no = '", input$existing_serial_no, "'"))
+      } else {
+        #find the row number for the existing observation
+        row <- which(instruments_data$sheet$serial_no == input$existing_serial_no)+1
+        exist_id <- instruments_data$sheet[row-1, "instrument_ID"]
+        googlesheets4::range_write(instruments_id, sheet = "instruments", data = instrument.df, range = paste0(row, ":", row) , col_names = FALSE, reformat = FALSE)
+      }
+
       shinyalert::shinyalert(paste0("Serial number ", input$serial_no, " modified"), type = "success", timer = 2000)
       new_entry <- TRUE
     }
     if (new_entry){
       #Reload the instruments sheet to reflect modifications
-      instruments_sheet <- googlesheets4::read_sheet(instruments_id, sheet = "instruments")
-      instruments_sheet <- as.data.frame(instruments_sheet)
+      if (use_database){
+        instruments_sheet <- DBI::dbReadTable(DB_con, "instruments")
+      } else {
+        instruments_sheet <- googlesheets4::read_sheet(instruments_id, sheet = "instruments")
+        instruments_sheet <- as.data.frame(instruments_sheet)
+      }
+
       instruments_data$sheet <- instruments_sheet #assign to a reactive again
       instruments_data$handhelds <- instruments_sheet[instruments_sheet$type == "Handheld (connects to bulkheads)" & is.na(instruments_sheet$date_retired) , ]
       instruments_data$others <- instruments_sheet[instruments_sheet$type != "Handheld (connects to bulkheads)" & is.na(instruments_sheet$date_retired) , ]
@@ -1184,11 +1227,20 @@ app_server <- function(input, output, session) {
       calibration_data$restarted_id <- incomplete_ID
 
       # Search for entries in parameter-specific sheets with the same observation_ID and update the fields
-      calibration_sheets <- googlesheets4::sheet_names(calibrations_id)
+      if (use_database){
+        all_sheets <- DBI::dbListTables(DB_con)
+        calibration_sheets <- all_sheets[!(all_sheets %in% c("instruments", "sensors"))]
+      } else {
+        calibration_sheets <- googlesheets4::sheet_names(calibrations_id)
+      }
       for (i in calibration_sheets[calibration_sheets != "observations"]) {
-        sheet <- googlesheets4::read_sheet(calibrations_id, sheet = i)
-        sheet <- as.data.frame(sheet)
-        sheet <- sheet[sheet$observation_ID == incomplete_ID , ]
+        if (use_database){
+          sheet <- DBI::dbGetQuery(DB_con, paste0("SELECT * FROM ", i, " WHERE observation_ID = ", incomplete_ID))
+        } else {
+          sheet <- googlesheets4::read_sheet(calibrations_id, sheet = i)
+          sheet <- as.data.frame(sheet)
+          sheet <- sheet[sheet$observation_ID == incomplete_ID , ]
+        }
         if (nrow(sheet) == 1){
           if (i == "temperature"){
             output_name <- "Temperature calibration"
@@ -1245,8 +1297,8 @@ app_server <- function(input, output, session) {
             complete$DO <- TRUE
             updateNumericInput(session, "baro_press_pre", value = sheet$baro_press_pre)
             updateNumericInput(session, "baro_press_post", value = sheet$baro_press_post)
-            updateNumericInput(session, "DO_pre", value = sheet$DO_pre)
-            updateNumericInput(session, "DO_post", value = sheet$DO_post)
+            updateNumericInput(session, "DO_pre", value = sheet$DO_pre_mgl)
+            updateNumericInput(session, "DO_post", value = sheet$DO_post_mgl)
             shinyjs::show("delete_DO")
           } else if (i == "depth"){
             output_name <- "Depth calibration"
@@ -1281,19 +1333,30 @@ app_server <- function(input, output, session) {
     if (delete_value == 0){
       shinyalert::shinyalert("0 is not a valid selection!", type = "error")
     } else {
-      shinyalert::shinyalert("Deleting old calibration", type = "info")
       delete_ID <- as.numeric(incomplete_observations[delete_value , 1])
-      calibration_sheets <- googlesheets4::sheet_names(calibrations_id)
+      shinyalert::shinyalert("Deleting old calibration", type = "info")
+      if (use_database){
+        all_sheets <- DBI::dbListTables(DB_con)
+        calibration_sheets <- all_sheets[!(all_sheets %in% c("instruments", "sensors"))]
+      } else {
+        calibration_sheets <- googlesheets4::sheet_names(calibrations_id)
+      }
       for (i in calibration_sheets){
-        sheet <- googlesheets4::read_sheet(calibrations_id, sheet = i)
-        sheet <- as.data.frame(sheet)
-        if (i == "observations"){
-          observations <- sheet[!sheet$observation_ID == delete_ID , ] #Used later to re-set the new observation_ID
-        }
-        if (nrow(sheet[sheet$observation_ID == delete_ID , ]) == 1){ #Checks if there's a corresponding entry to the sheet, deletes if there is
-          row <- which(sheet$observation_ID == delete_ID)+1
-          print(row)
-          googlesheets4::range_clear(calibrations_id, sheet = i,range = paste0(row, ":", row))
+        if (use_database){
+          if (i == "observations"){ #Used later to re-set the new observation_ID
+            observations <- DBI::dbGetQuery(DB_con, paste0("SELECT * FROM observations WHERE NOT observation_ID = ", delete_ID))
+          }
+          DBI::dbExecute(DB_con, paste0("DELETE FROM ", i, " WHERE observation_ID = ", delete_ID))
+        } else {
+          sheet <- googlesheets4::read_sheet(calibrations_id, sheet = i)
+          sheet <- as.data.frame(sheet)
+          if (i == "observations"){ #Used later to re-set the new observation_ID
+            observations <- sheet[!sheet$observation_ID == delete_ID , ]
+          }
+          if (nrow(sheet[sheet$observation_ID == delete_ID , ]) == 1){ #Checks if there's a corresponding entry to the sheet, deletes if there is
+            row <- which(sheet$observation_ID == delete_ID)+1
+            googlesheets4::range_clear(calibrations_id, sheet = i,range = paste0(row, ":", row))
+          }
         }
       }
       complete$incomplete <- complete$incomplete[!complete$incomplete$Index == delete_value ,]
@@ -1703,7 +1766,7 @@ app_server <- function(input, output, session) {
     tryCatch({
       depth_check <- input$depth_check_ok
       depth_change <- input$depth_changes_ok
-      if (depth_check == "TRUE" & depth_change == "TRUE"){
+      if (depth_check & depth_change){
         shinyalert::shinyalert(title = "Good to go!", type = "success", timer = 2000)
       } else {
         shinyalert::shinyalert(title = "You indicated FALSE for one of the values. Are you sure about that? Should you be using a different sensor?", type = "warning")
@@ -1751,11 +1814,23 @@ app_server <- function(input, output, session) {
                                            ID_handheld_meter = input$ID_handheld_meter,
                                            complete = FALSE)
       if (!complete$basic){
-        googlesheets4::sheet_append(calibrations_id, sheet="observations", data = calibration_data$basic)
+        if (use_database){
+          DBI::dbAppendTable(DB_con, "observations", calibration_data$basic)
+        } else {
+          googlesheets4::sheet_append(calibrations_id, sheet="observations", data = calibration_data$basic)
+        }
         complete$basic <- TRUE
       } else {
+        if (use_database){
+          DBI::dbExecute(DB_con, paste0("UPDATE observations SET observer = '", input$observer,
+                                        "', obs_datetime = '", as.character(input$obs_datetime),
+                                        "', ID_sensor_holder = '", input$ID_sensor_holder,
+                                        "', ID_handheld_meter = '", input$ID_handheld_meter,
+                                        "' WHERE observation_ID = ", calibration_data$next_id, ""))
+        } else {
+          googlesheets4::range_write(calibrations_id, data = calibration_data$basic, sheet = "observations", range = paste0("A", which(observations$observation_ID == calibration_data$next_id)+1), col_names = FALSE, reformat = FALSE)
+        }
 
-        googlesheets4::range_write(calibrations_id, data = calibration_data$basic, sheet = "observations", range = paste0("A", which(observations$observation_ID == calibration_data$next_id)+1), col_names = FALSE, reformat = FALSE)
       }
       if ("Basic info" %in% send_table$saved[ ,1] | "Basic info" %in% send_table$restarted_cal[ ,1]){
         shinyalert::shinyalert(title = "Basic info overwritten", type = "success", timer = 2000, immediate = TRUE)
@@ -1791,14 +1866,34 @@ app_server <- function(input, output, session) {
                                         pH2_post_val = input$pH2_post_val,
                                         pH3_post_val = input$pH3_post_val)
       if (!complete$pH){
-        googlesheets4::sheet_append(calibrations_id, sheet="pH", data = calibration_data$pH)
+        if (use_database){
+          DBI::dbAppendTable(DB_con, "pH", calibration_data$pH)
+        } else {
+          googlesheets4::sheet_append(calibrations_id, sheet="pH", data = calibration_data$pH)
+        }
         complete$pH <- TRUE
         shinyjs::show("delete_pH")
       } else {
-        pH_sheet <- googlesheets4::read_sheet(calibrations_id, sheet = "pH")
-        pH_sheet <- as.data.frame(pH_sheet)
-        row <- which(pH_sheet$observation_ID == calibration_data$next_id)+1
-        googlesheets4::range_write(calibrations_id, data = calibration_data$pH, sheet = "pH", range = paste0("A", row), col_names = FALSE, reformat = FALSE)
+        if (use_database){
+          DBI::dbExecute(DB_con, paste0("UPDATE pH SET pH1_std = ", input$pH1_std,
+                                        ", pH2_std = ", input$pH2_std,
+                                        ", pH3_std = ", input$pH3_std,
+                                        ", pH1_pre_val = ", input$pH1_pre_val,
+                                        ", pH2_pre_val = ", input$pH2_pre_val,
+                                        ", pH3_pre_val = ", input$pH3_pre_val,
+                                        ", pH1_mV = ", input$pH1_mV,
+                                        ", pH2_mV = ", input$pH2_mV,
+                                        ", pH3_mV = ", input$pH3_mV,
+                                        ", pH1_post_val = ", input$pH1_post_val,
+                                        ", pH2_post_val = ", input$pH2_post_val,
+                                        ", pH3_post_val = ", input$pH3_post_val,
+                                        " WHERE observation_ID = ", calibration_data$next_id))
+        } else {
+          pH_sheet <- googlesheets4::read_sheet(calibrations_id, sheet = "pH")
+          pH_sheet <- as.data.frame(pH_sheet)
+          row <- which(pH_sheet$observation_ID == calibration_data$next_id)+1
+          googlesheets4::range_write(calibrations_id, data = calibration_data$pH, sheet = "pH", range = paste0("A", row), col_names = FALSE, reformat = FALSE)
+        }
       }
       if (!complete$basic){
         if (!("Basic info" %in% send_table$saved)){
@@ -1808,7 +1903,11 @@ app_server <- function(input, output, session) {
                                                ID_sensor_holder = "NOT SET",
                                                ID_handheld_meter = "NOT SET",
                                                complete = FALSE)
-          googlesheets4::sheet_append(calibrations_id, sheet="observations", data = calibration_data$basic)
+          if (use_database){
+            DBI::dbAppendTable(DB_con, "observations", calibration_data$basic)
+          } else {
+            googlesheets4::sheet_append(calibrations_id, sheet="observations", data = calibration_data$basic)
+          }
           complete$basic <- TRUE
         }
       }
@@ -1833,10 +1932,14 @@ app_server <- function(input, output, session) {
   observeEvent(input$delete_pH, {
     shinyalert::shinyalert("Deleting...", type = "info")
     #delete on remote sheet
-    pH_sheet <- googlesheets4::read_sheet(calibrations_id, sheet = "pH")
-    pH_sheet <- as.data.frame(pH_sheet)
-    row <- which(pH_sheet$observation_ID == calibration_data$next_id)+1
-    googlesheets4::range_clear(calibrations_id, sheet = "pH", range = paste0(row, ":", row))
+    if (use_database){
+      DBI::dbExecute(DB_con, paste0("DELETE FROM pH WHERE observation_ID = ", calibration_data$next_id))
+    } else {
+      pH_sheet <- googlesheets4::read_sheet(calibrations_id, sheet = "pH")
+      pH_sheet <- as.data.frame(pH_sheet)
+      row <- which(pH_sheet$observation_ID == calibration_data$next_id)+1
+      googlesheets4::range_clear(calibrations_id, sheet = "pH", range = paste0(row, ":", row))
+    }
     #reset the fields
     reset_ph()
     #remove from display tables
@@ -1868,14 +1971,25 @@ app_server <- function(input, output, session) {
                                           temp_reference = input$temp_reference,
                                           temp_observed = input$temp_observed)
       if (!complete$temperature){
-        googlesheets4::sheet_append(calibrations_id, sheet="temperature", data = calibration_data$temp)
+        if (use_database){
+          DBI::dbAppendTable(DB_con, "temperature", calibration_data$temp)
+        } else {
+          googlesheets4::sheet_append(calibrations_id, sheet="temperature", data = calibration_data$temp)
+        }
         complete$temperature <- TRUE
         shinyjs::show("delete_temp")
       } else {
-        temp_sheet <- googlesheets4::read_sheet(calibrations_id, sheet = "temperature")
-        temp_sheet <- as.data.frame(temp_sheet)
-        row <- which(temp_sheet$observation_ID == calibration_data$next_id)+1
-        googlesheets4::range_write(calibrations_id, data = calibration_data$temp, sheet = "temperature", range = paste0("A", row), col_names = FALSE, reformat = FALSE)
+        if (use_database){
+          DBI::dbExecute(DB_con, paste0("UPDATE temperature SET temp_reference_desc = '", input$temp_reference_desc,
+                                        "', temp_reference = ", input$temp_reference,
+                                        ", temp_observed = ", input$temp_observed,
+                                        " WHERE observation_ID = ", calibration_data$next_id))
+        } else {
+          temp_sheet <- googlesheets4::read_sheet(calibrations_id, sheet = "temperature")
+          temp_sheet <- as.data.frame(temp_sheet)
+          row <- which(temp_sheet$observation_ID == calibration_data$next_id)+1
+          googlesheets4::range_write(calibrations_id, data = calibration_data$temp, sheet = "temperature", range = paste0("A", row), col_names = FALSE, reformat = FALSE)
+        }
       }
       if (!complete$basic){
         if (!("Basic info" %in% send_table$saved)){
@@ -1885,7 +1999,11 @@ app_server <- function(input, output, session) {
                                                ID_sensor_holder = "NOT SET",
                                                ID_handheld_meter = "NOT SET",
                                                complete = FALSE)
-          googlesheets4::sheet_append(calibrations_id, sheet="observations", data = calibration_data$basic)
+          if (use_database){
+            DBI::dbAppendTable(DB_con, "observations", calibration_data$basic)
+          } else {
+            googlesheets4::sheet_append(calibrations_id, sheet="observations", data = calibration_data$basic)
+          }
           complete$basic <- TRUE
         }
       }
@@ -1909,10 +2027,14 @@ app_server <- function(input, output, session) {
 
   observeEvent(input$delete_temp, {
     shinyalert::shinyalert("Deleting...", type = "info")
-    temp_sheet <- googlesheets4::read_sheet(calibrations_id, sheet = "temperature")
-    temp_sheet <- as.data.frame(temp_sheet)
-    row <- which(temp_sheet$observation_ID == calibration_data$next_id)+1
-    googlesheets4::range_clear(calibrations_id, sheet = "temperature", range = paste0(row, ":", row))
+    if (use_database){
+      DBI::dbExecute(DB_con, paste0("DELETE FROM temperature WHERE observation_ID = ", calibration_data$next_id))
+    } else {
+      temp_sheet <- googlesheets4::read_sheet(calibrations_id, sheet = "temperature")
+      temp_sheet <- as.data.frame(temp_sheet)
+      row <- which(temp_sheet$observation_ID == calibration_data$next_id)+1
+      googlesheets4::range_clear(calibrations_id, sheet = "temperature", range = paste0(row, ":", row))
+    }
     #reset the fields
     reset_temp()
     #remove from display tables
@@ -1944,14 +2066,26 @@ app_server <- function(input, output, session) {
                                          orp_pre_mV = input$orp_pre_mV,
                                          orp_post_mV = input$orp_post_mV)
       if (!complete$orp){
-        googlesheets4::sheet_append(calibrations_id, sheet="ORP", data = calibration_data$orp)
+        if (use_database){
+          DBI::dbAppendTable(DB_con, "ORP", calibration_data$orp)
+        } else {
+          googlesheets4::sheet_append(calibrations_id, sheet="ORP", data = calibration_data$orp)
+        }
         complete$orp <- TRUE
         shinyjs::show("delete_orp")
       } else {
-        orp_sheet <- googlesheets4::read_sheet(calibrations_id, sheet = "ORP")
-        ORP_sheet <- as.data.frame(ORP_sheet)
-        row <- which(orp_sheet$observation_ID == calibration_data$next_id)+1
-        googlesheets4::range_write(calibrations_id, data = calibration_data$orp, sheet = "ORP", range = paste0("A", row), col_names = FALSE, reformat = FALSE)
+        if (use_database){
+          DBI::dbExecute(DB_con, paste0("UPDATE ORP SET orp_std = ", input$orp_std,
+                                        " orp_pre_mV = ", input$orp_pre_mV,
+                                        " orp_post_mV = ", input$orp_post_mV,
+                                        " WHERE observation_ID = ", calibration_data$next_id))
+        } else {
+          orp_sheet <- googlesheets4::read_sheet(calibrations_id, sheet = "ORP")
+          ORP_sheet <- as.data.frame(ORP_sheet)
+          row <- which(orp_sheet$observation_ID == calibration_data$next_id)+1
+          googlesheets4::range_write(calibrations_id, data = calibration_data$orp, sheet = "ORP", range = paste0("A", row), col_names = FALSE, reformat = FALSE)
+        }
+
       }
       if (!complete$basic){
         if (!("Basic info" %in% send_table$saved)){
@@ -1961,7 +2095,11 @@ app_server <- function(input, output, session) {
                                                ID_sensor_holder = "NOT SET",
                                                ID_handheld_meter = "NOT SET",
                                                complete = FALSE)
-          googlesheets4::sheet_append(calibrations_id, sheet="observations", data = calibration_data$basic)
+          if (use_database){
+            DBI::dbAppendTable(DB_con, "observations", calibration_data$basic)
+          } else {
+            googlesheets4::sheet_append(calibrations_id, sheet="observations", data = calibration_data$basic)
+          }
           complete$basic <- TRUE
         }
       }
@@ -1984,10 +2122,14 @@ app_server <- function(input, output, session) {
   }, ignoreInit = TRUE)
   observeEvent(input$delete_orp, {
     shinyalert::shinyalert("Deleting...", type = "info")
-    orp_sheet <- googlesheets4::read_sheet(calibrations_id, sheet = "ORP")
-    ORP_sheet <- as.data.frame(ORP_sheet)
-    row <- which(orp_sheet$observation_ID == calibration_data$next_id)+1
-    googlesheets4::range_clear(calibrations_id, sheet = "ORP", range = paste0(row, ":", row))
+    if (use_database){
+      DBI::dbExecute(DB_con, paste0("DELETE FROM ORP WHERE observation_ID = ", calibration_data$next_id))
+    } else {
+      orp_sheet <- googlesheets4::read_sheet(calibrations_id, sheet = "ORP")
+      ORP_sheet <- as.data.frame(ORP_sheet)
+      row <- which(orp_sheet$observation_ID == calibration_data$next_id)+1
+      googlesheets4::range_clear(calibrations_id, sheet = "ORP", range = paste0(row, ":", row))
+    }
     #reset the fields
     reset_orp()
     #remove from display tables
@@ -2025,14 +2167,28 @@ app_server <- function(input, output, session) {
                                            SpC2_pre = if (input$spc_or_not) input$SpC2_pre/(1+0.02*(calibration_data$temp$temp_reference - 25)) else input$SpC2_pre,
                                            SpC2_post = if (input$spc_or_not) input$SpC2_post/(1+0.02*(calibration_data$temp$temp_reference - 25)) else input$SpC2_post)
         if (!complete$SpC){
-          googlesheets4::sheet_append(calibrations_id, sheet="SpC", data = calibration_data$SpC)
+          if (use_database) {
+            DBI::dbAppendTable(DB_con, "SpC", calibration_data$SpC)
+          } else {
+            googlesheets4::sheet_append(calibrations_id, sheet="SpC", data = calibration_data$SpC)
+          }
           complete$SpC <- TRUE
           shinyjs::show("delete_SpC")
         } else {
-          SpC_sheet <- googlesheets4::read_sheet(calibrations_id, sheet = "SpC")
-          SpC_sheet <- as.data.frame(SpC_sheet)
-          row <- which(SpC_sheet$observation_ID == calibration_data$next_id)+1
-          googlesheets4::range_write(calibrations_id, data = calibration_data$SpC, sheet = "SpC", range = paste0("A", row), col_names = FALSE, reformat = FALSE)
+          if (use_database){
+            DBI::dbExecute(DB_con, paste0("UPDATE SpC SET SpC1_std = ", input$SpC1_std,
+                                          " SpC1_pre = ", if (input$spc_or_not) input$SpC1_pre/(1+0.02*(calibration_data$temp$temp_reference - 25)) else input$SpC1_pre,
+                                          " SpC1_post = ", if (input$spc_or_not) input$SpC1_post/(1+0.02*(calibration_data$temp$temp_reference - 25)) else input$SpC1_post,
+                                          " SpC2_std = ", input$SpC2_std,
+                                          " SpC2_pre = ", if (input$spc_or_not) input$SpC2_pre/(1+0.02*(calibration_data$temp$temp_reference - 25)) else input$SpC2_pre,
+                                          " SpC2_post = ", if (input$spc_or_not) input$SpC2_post/(1+0.02*(calibration_data$temp$temp_reference - 25)) else input$SpC2_post,
+                                          " WHERE observation_ID = ", calibration_data$next_id))
+          } else {
+            SpC_sheet <- googlesheets4::read_sheet(calibrations_id, sheet = "SpC")
+            SpC_sheet <- as.data.frame(SpC_sheet)
+            row <- which(SpC_sheet$observation_ID == calibration_data$next_id)+1
+            googlesheets4::range_write(calibrations_id, data = calibration_data$SpC, sheet = "SpC", range = paste0("A", row), col_names = FALSE, reformat = FALSE)
+          }
         }
         if (!complete$basic){
           if (!("Basic info" %in% send_table$saved)){
@@ -2042,7 +2198,11 @@ app_server <- function(input, output, session) {
                                                  ID_sensor_holder = "NOT SET",
                                                  ID_handheld_meter = "NOT SET",
                                                  complete = FALSE)
-            googlesheets4::sheet_append(calibrations_id, sheet="observations", data = calibration_data$basic)
+            if (use_database){
+              DBI::dbAppendTable(DB_con, "observations", calibration_data$basic)
+            } else {
+              googlesheets4::sheet_append(calibrations_id, sheet="observations", data = calibration_data$basic)
+            }
             complete$basic <- TRUE
           }
         }
@@ -2066,10 +2226,14 @@ app_server <- function(input, output, session) {
   }, ignoreInit = TRUE)
   observeEvent(input$delete_SpC, {
     shinyalert::shinyalert("Deleting...", type = "info")
-    SpC_sheet <- googlesheets4::read_sheet(calibrations_id, sheet = "SpC")
-    SpC_sheet <- as.data.frame(SpC_sheet)
-    row <- which(SpC_sheet$observation_ID == calibration_data$next_id)+1
-    googlesheets4::range_clear(calibrations_id, sheet = "SpC", range = paste0(row, ":", row))
+    if (use_database){
+      DBI::dbExecute(DB_con, paste0("DELETE FROM SpC WHERE observation_ID = ", calibration_data$next_id))
+    } else {
+      SpC_sheet <- googlesheets4::read_sheet(calibrations_id, sheet = "SpC")
+      SpC_sheet <- as.data.frame(SpC_sheet)
+      row <- which(SpC_sheet$observation_ID == calibration_data$next_id)+1
+      googlesheets4::range_clear(calibrations_id, sheet = "SpC", range = paste0(row, ":", row))
+    }
     #reset the fields
     reset_spc()
     #remove from display tables
@@ -2104,14 +2268,28 @@ app_server <- function(input, output, session) {
                                           turb2_pre = input$turb2_pre,
                                           turb2_post = input$turb2_post)
       if (!complete$turbidity){
-        googlesheets4::sheet_append(calibrations_id, sheet="turbidity", data = calibration_data$turb)
+        if (use_database){
+          DBI::dbAppendTable(DB_con, "turbidity", calibration_data$turb)
+        } else {
+          googlesheets4::sheet_append(calibrations_id, sheet="turbidity", data = calibration_data$turb)
+        }
         complete$turbidity <- TRUE
         shinyjs::show("delete_turb")
       } else {
-        turb_sheet <- googlesheets4::read_sheet(calibrations_id, sheet = "turbidity")
-        turb_sheet <- as.data.frame(turb_sheet)
-        row <- which(turb_sheet$observation_ID == calibration_data$next_id)+1
-        googlesheets4::range_write(calibrations_id, data = calibration_data$turb, sheet = "turbidity", range = paste0("A", row), col_names = FALSE, reformat = FALSE)
+        if (use_database){
+          DBI::dbExecute(DB_con, paste0("UPDATE turbidity SET turb1_std = ", input$turb1_std,
+                                          ", turb1_pre = ", input$turb1_pre,
+                                          ", turb1_post = ", input$turb1_post,
+                                          ", turb2_std = ", input$turb2_std,
+                                          ", turb2_pre = ", input$turb2_pre,
+                                          ", turb2_post = ", input$turb2_post,
+                                          " WHERE observation_ID = ", calibration_data$next_id))
+        } else {
+          turb_sheet <- googlesheets4::read_sheet(calibrations_id, sheet = "turbidity")
+          turb_sheet <- as.data.frame(turb_sheet)
+          row <- which(turb_sheet$observation_ID == calibration_data$next_id)+1
+          googlesheets4::range_write(calibrations_id, data = calibration_data$turb, sheet = "turbidity", range = paste0("A", row), col_names = FALSE, reformat = FALSE)
+        }
       }
       if (!complete$basic){
         if (!("Basic info" %in% send_table$saved)){
@@ -2121,7 +2299,11 @@ app_server <- function(input, output, session) {
                                                ID_sensor_holder = "NOT SET",
                                                ID_handheld_meter = "NOT SET",
                                                complete = FALSE)
-          googlesheets4::sheet_append(calibrations_id, sheet="observations", data = calibration_data$basic)
+          if (use_database){
+            DBI::dbAppendTable(DB_con, "observations", calibration_data$basic)
+          } else {
+            googlesheets4::sheet_append(calibrations_id, sheet="observations", data = calibration_data$basic)
+          }
           complete$basic <- TRUE
         }
       }
@@ -2144,10 +2326,14 @@ app_server <- function(input, output, session) {
   }, ignoreInit = TRUE)
   observeEvent(input$delete_turb, {
     shinyalert::shinyalert("Deleting...", type = "info")
-    turb_sheet <- googlesheets4::read_sheet(calibrations_id, sheet = "turbidity")
-    turb_sheet <-  as.data.frame(turb_sheet)
-    row <- which(turb_sheet$observation_ID == calibration_data$next_id)+1
-    googlesheets4::range_clear(calibrations_id, sheet = "turbidity", range = paste0(row, ":", row))
+    if (use_database){
+      DBI::dbExecute(DB_con, paste0("DELETE FROM turbidity WHERE observation_ID = ", calibration_data$next_id))
+    } else {
+      turb_sheet <- googlesheets4::read_sheet(calibrations_id, sheet = "turbidity")
+      turb_sheet <-  as.data.frame(turb_sheet)
+      row <- which(turb_sheet$observation_ID == calibration_data$next_id)+1
+      googlesheets4::range_clear(calibrations_id, sheet = "turbidity", range = paste0(row, ":", row))
+    }
     #reset the fields
     reset_turb()
     #remove from display tables
@@ -2177,17 +2363,29 @@ app_server <- function(input, output, session) {
       calibration_data$DO <- data.frame(observation_ID = calibration_data$next_id,
                                         baro_press_pre = input$baro_press_pre,
                                         baro_press_post = input$baro_press_post,
-                                        DO_pre = input$DO_pre,
-                                        DO_post = input$DO_post)
+                                        DO_pre_mgl = input$DO_pre,
+                                        DO_post_mgl = input$DO_post)
       if (!complete$DO){
-        googlesheets4::sheet_append(calibrations_id, sheet="DO", data = calibration_data$DO)
+        if (use_database){
+          DBI::dbAppendTable(DB_con, "DO", calibration_data$DO)
+        } else {
+          googlesheets4::sheet_append(calibrations_id, sheet="DO", data = calibration_data$DO)
+        }
         complete$DO <- TRUE
         shinyjs::show("delete_DO")
       } else {
-        DO_sheet <- googlesheets4::read_sheet(calibrations_id, sheet = "DO")
-        DO_sheet <- as.data.frame(DO_sheet)
-        row <- which(DO_sheet$observation_ID == calibration_data$next_id)+1
-        googlesheets4::range_write(calibrations_id, data = calibration_data$DO, sheet = "DO", range = paste0("A", row), col_names = FALSE, reformat = FALSE)
+        if (use_database){
+          DBI::dbExecute(DB_con, paste0("UPDATE DO SET baro_press_pre = ", input$baro_press_pre,
+                                        ", baro_press_post = ", input$baro_press_post,
+                                        ", DO_pre_mgl = ", input$DO_pre,
+                                        ", DO_post_mgl = ", input$DO_post,
+                                        " WHERE observation_ID = ", calibration_data$next_id))
+        } else {
+          DO_sheet <- googlesheets4::read_sheet(calibrations_id, sheet = "DO")
+          DO_sheet <- as.data.frame(DO_sheet)
+          row <- which(DO_sheet$observation_ID == calibration_data$next_id)+1
+          googlesheets4::range_write(calibrations_id, data = calibration_data$DO, sheet = "DO", range = paste0("A", row), col_names = FALSE, reformat = FALSE)
+        }
       }
       if (!complete$basic){
         if (!("Basic info" %in% send_table$saved)){
@@ -2197,7 +2395,11 @@ app_server <- function(input, output, session) {
                                                ID_sensor_holder = "NOT SET",
                                                ID_handheld_meter = "NOT SET",
                                                complete = FALSE)
-          googlesheets4::sheet_append(calibrations_id, sheet="observations", data = calibration_data$basic)
+          if (use_database){
+            DBI::dbAppendTable(DB_con, "observations", calibration_data$basic)
+          } else {
+            googlesheets4::sheet_append(calibrations_id, sheet="observations", data = calibration_data$basic)
+          }
           complete$basic <- TRUE
         }
       }
@@ -2220,10 +2422,14 @@ app_server <- function(input, output, session) {
   }, ignoreInit = TRUE)
   observeEvent(input$delete_DO, {
     shinyalert::shinyalert("Deleting...", type = "info")
-    DO_sheet <- googlesheets4::read_sheet(calibrations_id, sheet = "DO")
-    DO_sheet <- as.data.frame(DO_sheet)
-    row <- which(DO_sheet$observation_ID == calibration_data$next_id)+1
-    googlesheets4::range_clear(calibrations_id, sheet = "DO", range = paste0(row, ":", row))
+    if (use_database){
+      DBI::dbExecute(DB_con, paste0("DELETE FROM DO WHERE observation_ID = ", calibration_data$next_id))
+    } else {
+      DO_sheet <- googlesheets4::read_sheet(calibrations_id, sheet = "DO")
+      DO_sheet <- as.data.frame(DO_sheet)
+      row <- which(DO_sheet$observation_ID == calibration_data$next_id)+1
+      googlesheets4::range_clear(calibrations_id, sheet = "DO", range = paste0(row, ":", row))
+    }
     #reset the fields
     reset_do()
     #remove from display tables
@@ -2254,14 +2460,22 @@ app_server <- function(input, output, session) {
                                            depth_check_ok = input$depth_check_ok,
                                            depth_changes_ok = input$depth_changes_ok)
       if (!complete$depth){
-        googlesheets4::sheet_append(calibrations_id, sheet="depth", data = calibration_data$depth)
+        if (use_database){
+          DBI::dbAppendTable(DB_con, "depth", calibration_data$depth)
+        } else {
+          googlesheets4::sheet_append(calibrations_id, sheet="depth", data = calibration_data$depth)
+        }
         complete$depth <- TRUE
         shinyjs::show("delete_depth")
       } else {
-        depth_sheet <- googlesheets4::read_sheet(calibrations_id, sheet = "depth")
-        depth_sheet <- as.data.frame(depth_sheet)
-        row <- which(depth_sheet$observation_ID == calibration_data$next_id)+1
-        googlesheets4::range_write(calibrations_id, data = calibration_data$depth, sheet = "depth", range = paste0("A", row), col_names = FALSE, reformat = FALSE)
+        if (use_database){
+          DBI::dbExecute(DB_con, paste0("UPDATE depth SET depth_check_ok = '", input$depth_check_ok, "', depth_changes_ok ='", input$depth_changes_ok, "' WHERE observation_ID = ", calibration_data$next_id))
+        } else {
+          depth_sheet <- googlesheets4::read_sheet(calibrations_id, sheet = "depth")
+          depth_sheet <- as.data.frame(depth_sheet)
+          row <- which(depth_sheet$observation_ID == calibration_data$next_id)+1
+          googlesheets4::range_write(calibrations_id, data = calibration_data$depth, sheet = "depth", range = paste0("A", row), col_names = FALSE, reformat = FALSE)
+        }
       }
       if (!complete$basic){
         if (!("Basic info" %in% send_table$saved)){
@@ -2271,7 +2485,11 @@ app_server <- function(input, output, session) {
                                                ID_sensor_holder = "NOT SET",
                                                ID_handheld_meter = "NOT SET",
                                                complete = FALSE)
-          googlesheets4::sheet_append(calibrations_id, sheet="observations", data = calibration_data$basic)
+          if (use_database){
+            DBI::dbAppendTable(DB_con, "observations", calibration_data$basic)
+          } else {
+            googlesheets4::sheet_append(calibrations_id, sheet="observations", data = calibration_data$basic)
+          }
           complete$basic <- TRUE
         }
       }
@@ -2294,10 +2512,15 @@ app_server <- function(input, output, session) {
   }, ignoreInit = TRUE)
   observeEvent(input$delete_depth, {
     shinyalert::shinyalert("Deleting...", type = "info")
-    depth_sheet <- googlesheets4::read_sheet(calibrations_id, sheet = "depth")
-    depth_sheet <- as.data.frame(depth_sheet)
-    row <- which(depth_sheet$observation_ID == calibration_data$next_id)+1
-    googlesheets4::range_clear(calibrations_id, sheet = "depth", range = paste0(row, ":", row))
+    if (use_database){
+      DBI::dbExecute(DB_con, paste0("DELETE FROM depth WHERE observation_ID = ", calibration_data$next_id))
+    } else {
+      depth_sheet <- googlesheets4::read_sheet(calibrations_id, sheet = "depth")
+      depth_sheet <- as.data.frame(depth_sheet)
+      row <- which(depth_sheet$observation_ID == calibration_data$next_id)+1
+      googlesheets4::range_clear(calibrations_id, sheet = "depth", range = paste0(row, ":", row))
+    }
+
     #reset the fields
     reset_depth()
     #remove from display tables
@@ -2330,9 +2553,14 @@ app_server <- function(input, output, session) {
       shinyalert::shinyalert("Are you sure?", "Finalized calibrations cannot be edited.", showCancelButton = TRUE,
                              callbackR = function(x) {
                                if (x) {# Mark it as complete == TRUE. Read in observations again as the sheet now has a new row or a row that is being edited from incomplete calibration.
-                                 observations <- googlesheets4::read_sheet(calibrations_id, sheet = "observations")
-                                 observations <- as.data.frame(observations)
-                                 googlesheets4::range_write(calibrations_id, data = data.frame(complete = TRUE), sheet = "observations", range = paste0("F", which(observations$observation_ID == calibration_data$next_id)+1), col_names = FALSE, reformat = FALSE)
+                                 if (use_database){
+                                   DBI::dbExecute(DB_con, paste0("UPDATE observations SET complete = 'TRUE' WHERE observation_ID = ", calibration_data$next_id))
+                                   observations <- DBI::dbReadTable(DB_con, "observations")
+                                 } else {
+                                   observations <- googlesheets4::read_sheet(calibrations_id, sheet = "observations")
+                                   observations <- as.data.frame(observations)
+                                   googlesheets4::range_write(calibrations_id, data = data.frame(complete = TRUE), sheet = "observations", range = paste0("F", which(observations$observation_ID == calibration_data$next_id)+1), col_names = FALSE, reformat = FALSE)
+                                 }
                                  observations[observations$observation_ID == calibration_data$next_id, "complete"] <- TRUE  #mark as complete in the local df as well
                                  shinyalert::shinyalert(title = paste0("Calibration finalized."),
                                                         type = "success", immediate = TRUE)

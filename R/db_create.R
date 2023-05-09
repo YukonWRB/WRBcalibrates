@@ -32,31 +32,40 @@ db_create <- function(path, overwrite = FALSE) {
                  "CREATE TABLE instruments (
           obs_datetime TEXT NOT NULL,
           observer TEXT NOT NULL,
-          instrument_ID INTEGER PRIMARY KEY AUTOINCREMENT,
+          instrument_ID INTEGER PRIMARY KEY,
           make TEXT NOT NULL,
           model TEXT NOT NULL,
           type TEXT NOT NULL,
           serial_no TEXT NOT NULL,
-          alias TEXT,
-          has_sensors TEXT NOT NULL,
+          asset_tag TEXT,
           date_in_service TEXT,
           date_purchased TEXT,
-          date_retired TEXT)")
+          retired_by TEXTT,
+          date_retired TEXT)
+                 WITHOUT ROWID")
 
   # Create "sensor_arrays" table
   DBI::dbExecute(con,
-                 "CREATE TABLE sensor_arrays (
+                 "CREATE TABLE sensors (
           instrument_ID INTEGER NOT NULL,
           observer TEXT NOT NULL,
           obs_datetime TEXT NOT NULL,
           sensor1_type TEXT,
+          sensor1_serial TEXT,
           sensor2_type TEXT,
+          sensor2_serial TEXT,
           sensor3_type TEXT,
+          sensor3_serial TEXT,
           sensor4_type TEXT,
+          sensor4_serial TEXT,
           sensor5_type TEXT,
+          sensor5_serial TEXT,
           sensor6_type TEXT,
+          sensor6_serial TEXT,
           sensor7_type TEXT,
+          sensor7_serial TEXT,
           sensor8_type TEXT,
+          sensor8_serial TEXT,
           sensor1_notes TEXT,
           sensor2_notes TEXT,
           sensor3_notes TEXT,
@@ -65,59 +74,102 @@ db_create <- function(path, overwrite = FALSE) {
           sensor6_notes TEXT,
           sensor7_notes TEXT,
           sensor8_notes TEXT,
-          PRIMARY KEY (ID, obs_datetime)
-          FOREIGN KEY (ID) REFERENCES instruments(ID))
+          PRIMARY KEY (obs_datetime)
+          FOREIGN KEY (instrument_ID) REFERENCES instruments(instrument_ID))
           WITHOUT ROWID")
 
   # Create "calibrations" table
   DBI::dbExecute(con,
-                 "CREATE TABLE calibrations (
-          obs_datetime TEXT NOT NULL,
-          observer TEXT NOT NULL,
-          ID_sensor_holder TEXT NOT NULL,
-          ID_handheld_meter TEXT,
-          temp_reference_desc TEXT,
-          temp_reference NUMERIC,
-          temp_observed NUMERIC,
-          pH1_std NUMERIC,
-          pH1_pre_val NUMERIC,
-          pH1_pre_mV NUMERIC,
-          pH1_post_val NUMERIC,
-          pH1_post_mV NUMERIC,
-          pH2_std NUMERIC,
-          pH2_pre_val NUMERIC,
-          pH2_pre_mV NUMERIC,
-          pH2_post_val NUMERIC,
-          pH2_post_mV NUMERIC,
-          pH3_std NUMERIC,
-          pH3_pre_val NUMERIC,
-          pH3_pre_mV NUMERIC,
-          pH3_post_val NUMERIC,
-          pH3_post_mV NUMERIC,
-          ORP_std NUMERIC,
-          ORP_pre_mV NUMERIC,
-          ORP_post_mV NUMERIC,
-          SpC1_std NUMERIC,
-          SpC1_pre NUMERIC,
-          SpC1_post NUMERIC,
-          SpC2_std NUMERIC,
-          SpC2_pre NUMERIC,
-          SpC2_post NUMERIC,
-          turb1_std NUMERIC,
-          turb1_pre NUMERIC,
-          turb1_post NUMERIC,
-          turb2_std NUMERIC,
-          turb2_pre NUMERIC,
-          turb2_post NUMERIC,
-          baro_press_pre NUMERIC,
-          baro_press_post NUMERIC,
-          DO_pre NUMERIC,
-          DO_post NUMERIC,
-          depth_check_ok TEXT,
-          depth_changes_ok TEXT,
-          PRIMARY KEY (ID_sensor_holder, obs_datetime)
-          FOREIGN KEY (ID_sensor_holder) REFERENCES instruments(ID)
-          FOREIGN KEY (ID_meter) REFERENCES instruments(ID))")
+                 "CREATE TABLE observations (
+                 observation_ID INTEGER NOT NULL,
+                 observer TEXT NOT NULL,
+                 obs_datetime TEXT NOT NULL,
+                 ID_sensor_holder TEXT NOT NULL,
+                 ID_handheld_meter TEXT,
+                 complete TEXT,
+                 PRIMARY KEY (observation_ID)
+                 FOREIGN KEY (ID_sensor_holder) REFERENCES instruments(instrument_ID)
+                 FOREIGN KEY (ID_handheld_meter) REFERENCES instruments(instruments_ID))
+                 WITHOUT ROWID")
+  DBI::dbExecute(con,
+                 "CREATE TABLE temperature (
+                 observation_ID INTEGER NOT NULL,
+                 temp_reference_desc TEXT NOT NULL,
+                 temp_reference	NUMERIC NOT NULL,
+                 temp_observed NUMERIC NOT NULL,
+                 PRIMARY KEY (observation_ID)
+                 FOREIGN KEY (observation_ID) REFERENCES observations(observation_ID))
+                 WITHOUT ROWID")
+  DBI::dbExecute(con,
+                 "CREATE TABLE SpC (
+                 observation_ID INTEGER NOT NULL,
+                 SpC1_std NUMERIC NOT NULL,
+                 SpC2_std	NUMERIC NOT NULL,
+                 SpC1_pre NUMERIC NOT NULL,
+                 SpC2_pre NUMERIC NOT NULL,
+                 SpC1_post NUMERIC NOT NULL,
+                 SpC2_post NUMERIC NOT NULL,
+                 PRIMARY KEY (observation_ID)
+                 FOREIGN KEY (observation_ID) REFERENCES observations(observation_ID))
+                 WITHOUT ROWID")
+  DBI::dbExecute(con,
+                 "CREATE TABLE pH (
+                 observation_ID INTEGER NOT NULL,
+                 pH1_std NUMERIC NOT NULL,
+                 pH2_std	NUMERIC NOT NULL,
+                 pH3_std NUMERIC,
+                 pH1_pre_val NUMERIC NOT NULL,
+                 pH2_pre_val NUMERIC NOT NULL,
+                 pH3_pre_val,
+                 pH1_mV NUMERIC NOT NULL,
+                 pH2_mV NUMERIC NOT NULL,
+                 pH3_mV NUMERIC,
+                 pH1_post_val NUMERIC NOT NULL,
+                 pH2_post_val NUMERIC NOT NULL,
+                 pH3_post_val,
+                 PRIMARY KEY (observation_ID)
+                 FOREIGN KEY (observation_ID) REFERENCES observations(observation_ID))
+                 WITHOUT ROWID")
+  DBI::dbExecute(con,
+                 "CREATE TABLE ORP (
+                 observation_ID INTEGER NOT NULL,
+                 orp_std	NUMERIC NOT NULL,
+                 orp_pre_mV NUMERIC NOT NULL,
+                 orp_post_mV NUMERIC NOT NULL,
+                 PRIMARY KEY (observation_ID)
+                 FOREIGN KEY (observation_ID) REFERENCES observations(observation_ID))
+                 WITHOUT ROWID")
+  DBI::dbExecute(con,
+                 "CREATE TABLE turbidity (
+                 observation_ID INTEGER NOT NULL,
+                 turb1_std NUMERIC NOT NULL,
+                 turb2_std	NUMERIC NOT NULL,
+                 turb1_pre NUMERIC NOT NULL,
+                 turb2_pre NUMERIC NOT NULL,
+                 turb1_post NUMERIC NOT NULL,
+                 turb2_post NUMERIC NOT NULL,
+                 PRIMARY KEY (observation_ID)
+                 FOREIGN KEY (observation_ID) REFERENCES observations(observation_ID))
+                 WITHOUT ROWID")
+  DBI::dbExecute(con,
+                 "CREATE TABLE DO (
+                 observation_ID INTEGER NOT NULL,
+                 baro_press_pre NUMERIC NOT NULL,
+                 baro_press_post	NUMERIC NOT NULL,
+                 DO_pre_mgl NUMERIC NOT NULL,
+                 DO_post_mgl NUMERIC NOT NULL,
+                 PRIMARY KEY (observation_ID)
+                 FOREIGN KEY (observation_ID) REFERENCES observations(observation_ID))
+                 WITHOUT ROWID")
+  DBI::dbExecute(con,
+                 "CREATE TABLE depth (
+                 observation_ID INTEGER NOT NULL,
+                 depth_check_ok NUMERIC NOT NULL,
+                 depth_changes_ok	NUMERIC NOT NULL,
+                 PRIMARY KEY (observation_ID)
+                 FOREIGN KEY (observation_ID) REFERENCES observations(observation_ID))
+                 WITHOUT ROWID")
+
 
   print(paste0("The database was successfully created at ", path, "."))
 }
