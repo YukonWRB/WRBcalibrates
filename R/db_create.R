@@ -171,5 +171,10 @@ db_create <- function(path, overwrite = FALSE) {
                  WITHOUT ROWID")
 
 
-  print(paste0("The database was successfully created at ", path, "."))
+  if (overwrite){
+    print(paste0("The database was overwritten at ", path, "."))
+  } else {
+    print(paste0("The database was successfully created at ", path, "."))
+  }
+
 }
