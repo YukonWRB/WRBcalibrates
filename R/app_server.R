@@ -570,6 +570,8 @@ app_server <- function(input, output, session) {
           DBI::dbExecute(DB_con, paste0("UPDATE sensors SET ", col_type, " = '", input$add_sensor_dropdown, "', ", col_comment, " = '", comment, "', ", col_serial, " = '", as.character(input$new_sensor_serial), "' WHERE obs_datetime = '", sensors_data$datetime, "'"))
         } else {
           #find the row number for that observation
+          sensors_sheet <- googlesheets4::read_sheet(sensors_id, sheet = "sensors") #Reload the sheet to mitigate conflicts
+          sensors_data$sensors <- as.data.frame(sensors_sheet)
           row <- which(sensors_data$sensors$obs_datetime == sensors_data$datetime & sensors_data$sensors$instrument_ID == sensors_data$instrument_ID)+1
           col_type <- which(colnames(sensors_data$sensors) == paste0("sensor", sensors_data$number + 1, "_type"))
           col_comment <- which(colnames(sensors_data$sensors) == paste0("sensor", sensors_data$number + 1, "_notes"))
@@ -995,6 +997,8 @@ app_server <- function(input, output, session) {
             DBI::dbExecute(DB_con, paste0("UPDATE sensors SET ", col_type, " = '", input$change_sensor, "', ", col_comment, " = '", input$add_comment, "', ", col_serial, " = '", as.character(input$add_sensor_serial), "' WHERE obs_datetime = '", sensors_data$datetime, "'"))
           } else {
             #find the row number for that observation
+            sensors_sheet <- googlesheets4::read_sheet(sensors_id, sheet = "sensors") #Reload the sheet to mitigate conflicts
+            sensors_data$sensors <- as.data.frame(sensors_sheet)
             row <- which(sensors_data$sensors$obs_datetime == sensors_data$datetime & sensors_data$sensors$instrument_ID == sensors_data$instrument_ID)+1
             col_type <- which(colnames(sensors_data$sensors) == paste0(sensors_data$selected, "_type"))
             col_comment <- which(colnames(sensors_data$sensors) == paste0(sensors_data$selected, "_notes"))
@@ -1113,6 +1117,12 @@ app_server <- function(input, output, session) {
   }, ignoreInit = TRUE)
 
   observeEvent(input$save_cal_instrument, { #save the new record or the changes to existing record
+    if (use_database){  #reload instruments_data$sheet to mitigate conflicts
+      instruments_data$sheet <- DBI::dbReadTable(DB_con, "instruments")
+    } else {
+      instruments_sheet <- googlesheets4::read_sheet(instruments_id, sheet = "instruments")
+      instruments_data$sheet <- as.data.frame(instruments_sheet)
+    }
     if (nrow(instruments_data$sheet) == 0){ #if there are no instruments listed yet...
       new_id <- 1
       check <- FALSE #definitely does not exist yet
@@ -1179,20 +1189,18 @@ app_server <- function(input, output, session) {
         exist_id <- instruments_data$sheet[row-1, "instrument_ID"]
         googlesheets4::range_write(instruments_id, sheet = "instruments", data = instrument.df, range = paste0(row, ":", row) , col_names = FALSE, reformat = FALSE)
       }
-
       shinyalert::shinyalert(paste0("Serial number ", input$serial_no, " modified"), type = "success", timer = 2000)
       new_entry <- TRUE
     }
     if (new_entry){
-      #Reload the instruments sheet to reflect modifications
+      #Reload the instruments sheet to integrate modifications
+      #TODO: This step could be avoided by simply adding the row or modifying a row in instruments_data$sheet and not re-reading.
       if (use_database){
-        instruments_sheet <- DBI::dbReadTable(DB_con, "instruments")
+        instruments_data$sheet <- DBI::dbReadTable(DB_con, "instruments")
       } else {
         instruments_sheet <- googlesheets4::read_sheet(instruments_id, sheet = "instruments")
-        instruments_sheet <- as.data.frame(instruments_sheet)
+        instruments_data$sheet <- as.data.frame(instruments_sheet)
       }
-
-      instruments_data$sheet <- instruments_sheet #assign to a reactive again
       instruments_data$handhelds <- instruments_sheet[instruments_sheet$type == "Handheld (connects to bulkheads)" & is.na(instruments_sheet$date_retired) , ]
       instruments_data$others <- instruments_sheet[instruments_sheet$type != "Handheld (connects to bulkheads)" & is.na(instruments_sheet$date_retired) , ]
       instruments_data$maintainable <- instruments_sheet[instruments_sheet$type %in% c("Sonde (multi-param deployable, interchangeable sensors)", "Bulkhead (requires handheld, not deployable)") , ]
@@ -1344,7 +1352,7 @@ app_server <- function(input, output, session) {
       for (i in calibration_sheets){
         if (use_database){
           if (i == "observations"){ #Used later to re-set the new observation_ID
-            observations <- DBI::dbGetQuery(DB_con, paste0("SELECT * FROM observations WHERE NOT observation_ID = ", delete_ID))
+            observations <- sheet[!sheet$observation_ID == delete_ID , ]
           }
           DBI::dbExecute(DB_con, paste0("DELETE FROM ", i, " WHERE observation_ID = ", delete_ID))
         } else {
@@ -1807,6 +1815,14 @@ app_server <- function(input, output, session) {
 
     if (validation_check$basic){
       shinyalert::shinyalert(title = "Saving...", type = "info")
+      if (use_database){
+        observations <- DBI::dbReadTable(DB_con, "observations")
+        calibration_data$next_id <- max(observations$observation_ID) + 1  # find out the new observation ID number, mitigating conflicts
+      } else {
+        observations <- googlesheets4::read_sheet(calibrations_id, sheet = "observations")
+        observations <- as.data.frame(observations)
+        calibration_data$next_id <- max(observations$observation_ID) + 1  # find out the new observation ID number, mitigating conflicts
+      }
       calibration_data$basic <- data.frame(observation_ID = calibration_data$next_id,
                                            observer = input$observer,
                                            obs_datetime = as.character(input$obs_datetime),
