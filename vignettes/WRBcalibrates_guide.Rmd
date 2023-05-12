@@ -1,0 +1,122 @@
+---
+title: "WRBcalibrates Shiny App User Guide"
+author: "Ghislain de Laplante"
+date: "2023-05-10"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{WRBcalibrates Shiny App User Guide}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r setup, include = FALSE}
+# You should be modifying this vignette from the .Rmd document in the /vignettes folder, NOT the .RMD in the /doc folder.
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>"
+)
+library(WRBcalibrates)
+
+```
+
+Important note regarding this vignette: if you are reading this in an HTML, Word or PDF document from the package folder on the G drive and wish to update the document, please do so via the vignette R Markdown document and re-publish/overwrite the document. The R Markdown document should be the ultimate source of truth regarding this R package and associated Shiny application. Instructions on how to do so are provided in the vignette Markdown document.
+
+This vignette may also come to contain R code and links to other documentation. For best performance and to ensure that all links function, it is recommended to view this vignette from within R Studio. You can view all package vignettes with 'vignette(package = "WRBcalibrates")' or this particular vignette with 'vignette(topic = "WRBcalibrates_guide")'.
+
+```{r vignette building comments, eval=FALSE, include=FALSE}
+# You should be modifying this vignette from the .Rmd document in the /vignettes folder, NOT the .RMD in the /doc folder.
+# To have this vignette updated on the G drive, uncomment and run the following code *after* re-building the vignette using devtools::build_vignettes()
+# file.copy(from = paste0(dirname(getwd()), "/doc/WRBcalibrates_guide.html"), to = "//env-fs/env-data/corp/water/Common_GW_SW/R-packages/WRBcalibrates/WRBcalibrates user guide.html", overwrite = TRUE)
+```
+
+# Introduction
+
+The Water Resources Branch has a long and stellar history of deploying and using field instruments, but a less than excellent record-keeping methodology. Consequently, many historical field measurements dependent on accurate sensor readings are questionable at best, unusable at worst. To remedy this problem, new protocols call for regular calibrations or cross-checking of instruments where measurements are not corrected by field readings (e.g. water levels). Calibration records can then be used to a) validate field readings, and b) to apply corrections or offsets to field measurements, for example by shifting temperatures to account for linear sensor drift.
+
+A first attempt at an application that could facilitate this record-keeping and, especially, facilitate future use of said data was done by CBTS in winter 2021. Unfortunately, due to poor software selection, staffing changes, and de-prioritization, this app was never fully operational. To avoid having another field season with only sparse paper records, a decision to create an in-house app was made in spring 2023, yielding an R Shiny application with much more flexibility and suitability for the task than the original Survey123 application.
+
+The Shiny application is built within an R package, the intent of which is to facilitate the collection and storage instrument and calibration data, ensure safe storage, and facilitate future use of collected data. The calibrations app itself is deployed on the web at <https://YukonWRB/shinyapps.io/WRBcalibrates/> as of 2023-05-08 and interacts with Google sheets for data storage. The strengths and limitations of this system is discussed below, as are future improvements to app and data storage schemes.
+
+# The WRBcalibrates package at a glance
+
+The WRBcalibrates package is viewable at the private GitHub repository [YukonWRB/WRBcalibrates (github.com)](https://github.com/YukonWRB/WRBcalibrates). The repository should be viewable by members of the YukonWRB organization, and is built with a typical R package structure. The primary functions within this package are:
+
+-   app_server() defines the server side of the Shiny app.
+
+-   app_ui() defines the user interface of the Shiny app.
+
+-   run_app() starts the Shiny application
+
+-   db_create() create an SQL-type database compliant with what is expected by the app.
+
+-   calConnect() creates a connection to the SQL-type database. This function is used within app_server, but should be referenced whenever connection to the calibrations database is necessary. Future changes to the database type or location can then be passed to a single function instead of having to find each connection.
+
+This package contains additional functions and capabilities, but these are beyond the scope of this vignette. Please consult the individual function help files or consult with the package developer for more information.
+
+# Running and updating the Shiny app
+
+You can run the app locally or access a deployed instance at shinyapps.io. Careful though: at this time, there is no provision to make Google Sheets and the local database congruent; it's one option or the other. Even though you could run the app locally and modify the code to work with a local database, those records would not be automatically sent to the Google Sheets data store and vice-versa. See section Future improvements for more details.
+
+## Local instances
+
+### Running the Shiny app
+
+Use the function run_app() from either the installed package or the package loaded by devtools::load_all(). Note that app_server() as a hard-coded parameter that controls usage of the Google Sheets storage or a local database: to use the local database, set use_database to TRUE at line 9.
+
+### Updating the Shiny app
+
+Updating the Shiny app code locally is simple: install the latest version of the package prior to calling function run_app(). Stable versions of the package are located on the G drive here and can be installed using function remotes::install_local(path_to_tar.gz file), or you can install the latest and (hopefully) greatest version from GitHub using function remotes::install_github(YukonWRB/WRBcalibrates)
+
+## Web-deployed instances
+
+### Running the Shiny app
+
+The app is published to shinyapps.io as of May 2023 and is accessible at <https://YukonWRB.shinyapps.io/WRBcalibrates/>.
+
+### Updating the Shiny app
+
+Updating the deployed app is done from RStudio, and you must have the package repository loaded as a project in RStudio and synchronized to GitHub.
+
+IMPORTANT: If this is the first time you run the app on your machine and you are using Google Sheets, you'll have to tweak the app_server.R code a bit and run the app locally first to set up a secret password allowing the connection to Google Sheets. Specifically:
+
+1.  Find the first big *if* loop containing commented code about authenticating from Google (at line 42 as of May 10, 2023).
+2.  Uncomment and run the lines calling function googlesheets4::gs4_auth() and , if needed, googledrive::drive_auth().
+3.  Call devtools::load_all(), then run the app with run_app().
+4.  The app will start, and so should a browser window asking you to confirm which email to use with google sheets. This email should be [wrbcalibrates\@gmail.com](mailto:wrbcalibrates@gmail.com), and the credentials are listed in the section of this document called "Passwords and logins".
+5.  The app should then load data; confirm that this worked by looking for instrument numbers in calibration basic data, managing instruments and sensors, or anywhere else that renders data pulled from Google.
+6.  Re-comment the two authentication lines that you ran in Step 2.
+7.  Call devtools::load_all() again to load these last changes.
+
+Once these steps are done, or to re-publish the app from a computer already holding the google secret codes, publish the app by following these steps:
+
+1.  Call up the app with run_app().
+2.  In the local instance of the app that pops up, find the "Publish" or "Republish" button at the top right.
+3.  Publish/republish the app. You can unclick many of the files/folders: anything starting with dev/, the /man and /test folders, as well as the README files. Everything else is necessary.
+
+# Data storage
+
+For simplicity and rapid deployment outside of YG wired networks, the app was initially deployed with a Google Sheets back-end. This isn't ideal, as it's impossible to pass SQL statements like "UPDATE table SET column = value WHERE condition": instead, a specific row or cell must be targeted. To mitigate the risk of conflicts where two users are using the application at the same time, each sheet is read immediately prior to modifying cell/row contents, which slows down the app considerably. SQL statements can avoid this issue with the WHERE clause, which can along with the SET statement can target a specific cell.
+
+The application is already set up to work with an SQL database however; all that's missing is a database to work with, and a modification to line 9 of the app_server.R file. Using an SQL-type database should be implemented as soon as practicable, as this would allow automatic backup, prevent potential authentication issues to Google, and drastically speed up the application.
+
+## SQL database setup
+
+As mentioned previously, there is a function already made to create an SQLite database and its schema as part of the package: db_create(). With a modification to the initial database connection code, this code could create tables in any database type that understands SQL language. That said, the function can create an SQLite database from scratch, which isn't possible with server-type databases. For databases like PostgreSQL, Microsoft SQL Server, or other types, the database should first be initialized outside of R without any tables; once that's done, modify the function to connect to the database and run the dbExecute() statements to create tables and establish relationships.
+
+Remember also to update the calConnect() function; it is currently set up to connect to an SQLite database on the G/Common_GW_SW folder, which will no longer be appropriate.
+
+# Future improvements
+
+Besides the migration of data storage from Google Sheets to an SQL-type database, the following improvements could be considered:
+
+-   There are a handful of instances where a table is re-read from the remote data store without being strictly necessary: it is possible to simply modify the tables stored in reactiveValues (in the R environment) to mirror the changes pushed to the remote store.
+
+-   Adding a user-interface component that permits viewing calibration entries. It's a bit tricky to sort out how best to serve this information to the user, and with the Google Sheets back-end, how to do so quickly. Calibrations are spread out across 8 different tables: one for the basic observation information (observer, instrument, time, etc) and 7 for the individual parameters. An end-user might be looking for all calibrations on a certain day or all calibrations with a certain instrument (both of which entails searching each table) or might be looking for calibrations of a certain parameters (two tables; the basic observation, and the parameter table). Careful selection of the filters visible to the user is necessary.
+
+-   The app could/should be deployed on a Linux machine using Shiny Server, as is done by the Yukon Geological Survey with their permafrost database. This solution bypasses the cost or hour limitations of shinyapps.io and permits us to use an SQL database without finding a suitable cloud database.
+
+-   The instruments table is inefficient in how it stores instrument types. Every entry is long and repeated, such as "Logger (single/multi-param deployable, fixed sensors)" instead, this could be a number that is referenced in another table. This would require changes to the server and ui codes as well as addition of a table with appropriate keys.
+
+# Passwords and logins
+
+For security reasons (as this package is maintained on GitHub), the passwords used to access Shinyapps.io and the Google Drive which can be used with this package are located in [this document](%22G:\water\Common_GW_SW\R-packages\WRBcalibrates\Shiny%20app%20secrets.txt%22).

@@ -33,8 +33,24 @@ table.on("click", "tr", function() {
 '
 
 ui <- fluidPage(
-  br(), br(),
-  DTOutput("my_table")
+  sidebarLayout(
+    sidebarPanel(
+      div(
+        selectInput("input1", "Input 1", choices = ""),
+        style = "color: white; background-color: blue;"
+      ),
+
+      div(
+        selectInput("input2", "Input 2", choices = ""),
+        style = "color: white; background-color: green;"
+      )
+    ),
+    mainPanel(
+      br(), br(),
+      DTOutput("my_table")
+    )
+
+  )
 )
 
 server <- function(input, output, session) {
@@ -47,8 +63,20 @@ server <- function(input, output, session) {
     )
   }, server = TRUE)
 
+  click_count <- reactiveValues(value = 0)
   observeEvent(input$my_table_rows_selected, {
-    print(input$my_table_rows_selected)
+    updateSelectInput(session, "input1", choices = 1:nrow(iris))
+    updateSelectInput(session, "input2", choices = 1:nrow(iris))
+    if (click_count$value <= 2){
+      print(input$my_table_rows_selected)
+      updateSelectInput(session, "input1", selected = input$my_table_rows_selected[1])
+      updateSelectInput(session, "input2", selected = input$my_table_rows_selected[2])
+      click_count$value <- click_count$value+1
+    } else {
+      print(input$my_table_rows_selected)
+      updateSelectInput(session, "input1", selected = input$my_table_rows_selected[2])
+      updateSelectInput(session, "input2", selected = input$my_table_rows_selected[3])
+    }
     if (length(input$my_table_rows_selected[input$my_table_rows_selected != 0]) > 2) {
       selection <- NULL
       proxy <- dataTableProxy("my_table")
@@ -66,3 +94,4 @@ server <- function(input, output, session) {
 }
 
 shinyApp(ui = ui, server = server)
+

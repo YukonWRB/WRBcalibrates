@@ -45,7 +45,7 @@ app_ui <- function(request) {
           conditionalPanel(
             condition = "input.first_selection == 'Manage instruments'",
             selectInput("existing_serial_no", "Search existing serial numbers", choices = "New record"),
-            textInput("serial_no", "New serial no", value = "Search first!"),
+            textInput("serial_no", "New serial no (add alias by appending to serial #, e.g. 012345Blue)", value = "Search first!"),
             textInput("recorder", label = "Observer name", value = ""),
             selectInput("make", label = "Instrument make", choices = c("", "YSI", "Solinst", "HOBO/Onset", "OTT", "RBR", "Campbell Sci", "In-Situ", "Other"), ),
             textInput("model", label = "Instrument model", value = ""),
