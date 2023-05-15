@@ -13,6 +13,7 @@ Imports:
     DT,
     golem,
     googlesheets4,
+    htmlwidgets,
     lifecycle,
     magrittr,
     respR,

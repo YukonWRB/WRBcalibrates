@@ -343,11 +343,11 @@ table.on("click", "tr", function() {
   output$manage_instruments_table <- DT::renderDataTable(initial_manage_instruments_table, rownames = FALSE, selection = "single")
   initial_instr_table <- reactiveValues(value = TRUE)
   output$calibration_instruments_table <- DT::renderDataTable({
-    datatable(
+    DT::datatable(
       initial_manage_instruments_table,
       rownames = FALSE,
       selection = "multiple",
-      callback = JS(table_reset)
+      callback = htmlwidgets::JS(table_reset)
     )
   }, server = TRUE)
 
@@ -388,24 +388,24 @@ table.on("click", "tr", function() {
     }
     if (length(input$calibration_instruments_table_rows_selected[input$calibration_instruments_table_rows_selected != 0]) > 2) {
       selection <- NULL
-      proxy <- dataTableProxy("my_table")
-      selectRows(proxy, selection, selected = FALSE)
+      proxy <- DT::dataTableProxy("my_table")
+      DT::selectRows(proxy, selection, selected = FALSE)
       if (initial_instr_table$value){
         output$calibration_instruments_table <- DT::renderDT({
-          datatable(
+          DT::datatable(
             initial_manage_instruments_table,
             rownames = FALSE,
             selection = "multiple",
-            callback = JS(table_reset)
+            callback = htmlwidgets::JS(table_reset)
           )
         }, server = TRUE)
       } else {
         output$calibration_instruments_table <- DT::renderDT({
-          datatable(
+          DT::datatable(
             instruments_data$manage_instruments,
             rownames = FALSE,
             selection = "multiple",
-            callback = JS(table_reset)
+            callback = htmlwidgets::JS(table_reset)
           )
         }, server = TRUE)
       }
@@ -2038,11 +2038,11 @@ table.on("click", "tr", function() {
       instruments_data$manage_instruments <- instruments_data$sheet[ , !colnames(instruments_data$sheet) %in% c("instrument_ID", "observer", "obs_datetime")]
       instruments_data$manage_instruments$type <- gsub(" .*", "", instruments_data$manage_instruments$type)
       output$calibration_instruments_table <- DT::renderDT({
-        datatable(
+        DT::datatable(
           instruments_data$manage_instruments,
           rownames = FALSE,
           selection = "multiple",
-          callback = JS(table_reset)
+          callback = htmlwidgets::JS(table_reset)
         )
       }, server = TRUE)
       shinyjs::show("calibration_instruments_table")
