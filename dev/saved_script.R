@@ -1,4 +1,4 @@
-#Code save. This allows for only two seleted rows from a datatable, and has them colored blue and green. Could be used as inputs to the instrument numbers when doing a calibtation.
+#Code save. This allows for only two selected rows from a datatable, and has them colored blue and green. Could be used as inputs to the instrument numbers when doing a calibration.
 
 library(shiny)
 library(DT)
