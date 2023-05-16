@@ -1,9 +1,9 @@
-#Code save. This allows for only two seleted rows from a datatable, and has them colored blue and green. Could be used as inputs to the instrument numbers when doing a calibtation.
+#Code save. This allows for only two selected rows from a datatable, and has them colored blue and green. Could be used as inputs to the instrument numbers when doing a calibration.
 
 library(shiny)
 library(DT)
 
-js <- '
+table_reset <- '
 var colors = ["blue", "green"];
 var stack = [];
 table.on("click", "tr", function() {
@@ -36,12 +36,12 @@ ui <- fluidPage(
   sidebarLayout(
     sidebarPanel(
       div(
-        selectInput("input1", "Input 1", choices = ""),
+        selectizeInput("input1", "Input 1", choices = ""),
         style = "color: white; background-color: blue;"
       ),
 
       div(
-        selectInput("input2", "Input 2", choices = ""),
+        selectizeInput("input2", "Input 2", choices = ""),
         style = "color: white; background-color: green;"
       )
     ),
@@ -59,23 +59,23 @@ server <- function(input, output, session) {
     datatable(
       iris,
       selection = "multiple",
-      callback = JS(js)
+      callback = JS(table_reset)
     )
   }, server = TRUE)
 
   click_count <- reactiveValues(value = 0)
   observeEvent(input$my_table_rows_selected, {
-    updateSelectInput(session, "input1", choices = 1:nrow(iris))
-    updateSelectInput(session, "input2", choices = 1:nrow(iris))
+    updateSelectizeInput(session, "input1", choices = 1:nrow(iris))
+    updateSelectizeInput(session, "input2", choices = 1:nrow(iris))
     if (click_count$value <= 2){
       print(input$my_table_rows_selected)
-      updateSelectInput(session, "input1", selected = input$my_table_rows_selected[1])
-      updateSelectInput(session, "input2", selected = input$my_table_rows_selected[2])
+      updateSelectizeInput(session, "input1", selected = input$my_table_rows_selected[1])
+      updateSelectizeInput(session, "input2", selected = input$my_table_rows_selected[2])
       click_count$value <- click_count$value+1
     } else {
       print(input$my_table_rows_selected)
-      updateSelectInput(session, "input1", selected = input$my_table_rows_selected[2])
-      updateSelectInput(session, "input2", selected = input$my_table_rows_selected[3])
+      updateSelectizeInput(session, "input1", selected = input$my_table_rows_selected[2])
+      updateSelectizeInput(session, "input2", selected = input$my_table_rows_selected[3])
     }
     if (length(input$my_table_rows_selected[input$my_table_rows_selected != 0]) > 2) {
       selection <- NULL

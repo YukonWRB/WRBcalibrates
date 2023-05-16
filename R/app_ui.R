@@ -26,10 +26,23 @@ app_ui <- function(request) {
       tags$head(
         tags$meta(name = "viewport", content = "width=device-width, initial-scale=1"),
         tags$link(rel = "manifest", href = "manifest.json"),
-        tags$link(rel = "apple-touch-icon", href = "icon.png"),
-        tags$link(rel = "icon", type = "image/png", href = "icon.png"),
+        tags$link(rel = "apple-touch-icon", href = "app-icon.png"),
+        tags$link(rel = "icon", type = "image/png", href = "app-icon.png"),
         tags$script(src = "serviceworker.js", type = "text/javascript"),
-        tags$style(type='text/css', ".selectize-dropdown-content {max-height: 400px; }")
+        tags$style(type='text/css', ".selectize-dropdown-content {max-height: 400px; }"),
+        tags$style(
+          HTML(
+            ".load_sensors_btn .btn {
+        display: block !important;
+        margin-bottom: 10px;}"
+          )
+        ),
+        tags$style(
+          HTML(
+            ".show_sensors_btns .btn:not(.hidden) {
+        display: block !important;}"
+          )
+        )
       ),
 
       shinyjs::extendShinyjs(text = jsCode, functions = c("backgroundCol")),
@@ -38,7 +51,7 @@ app_ui <- function(request) {
       titlePanel("Instrument Calibration and Tracking"),
       # Broad category selection
       selectInput("first_selection", label = "Choose a task", choices = c("Calibrate", "Manage instruments", "Manage sensors and log maintenance", "View unfinished calibrations"#, "View completed calibrations"
-                                                                          )),
+      )),
       # Input form
       sidebarLayout(
         sidebarPanel(
@@ -62,15 +75,21 @@ app_ui <- function(request) {
             condition = "input.first_selection == 'Manage sensors and log maintenance'",
             textOutput("sensors_reminder"),
             selectInput("maintain_serial", "Select your instrument", choices = "loading choices..."), #updated by the server
-            actionButton("load_sensors", "Load data"), #triggers shinyjs::show for the sensors, depending on how many are on the device
-            actionButton("sensor1_show", "Slot 1"), #updated by the server, hidden until load_sensors is clicked. Value will go on another line using HTML("line 1<br>line2)
-            actionButton("sensor2_show", "Slot 2"),
-            actionButton("sensor3_show", "Slot 3"),
-            actionButton("sensor4_show", "Slot 4"),
-            actionButton("sensor5_show", "Slot 5"),
-            actionButton("sensor6_show", "Slot 6"),
-            actionButton("sensor7_show", "Slot 7"),
-            actionButton("sensor8_show", "Slot 8"),
+            div(class = "load_sensors_btn",
+                actionButton("load_sensors", "Show sensors"), #triggers shinyjs::show for the sensors, depending on how many are on the device
+            ),
+            div (class = "show_sensors_btns",
+                 actionButton("sensor1_show", "Slot 1"), #updated by the server, hidden until load_sensors is clicked. Value will go on another line using HTML("line 1<br>line2)
+                 actionButton("sensor2_show", "Slot 2"),
+                 actionButton("sensor3_show", "Slot 3"),
+                 actionButton("sensor4_show", "Slot 4"),
+                 actionButton("sensor5_show", "Slot 5"),
+                 actionButton("sensor6_show", "Slot 6"),
+                 actionButton("sensor7_show", "Slot 7"),
+                 actionButton("sensor8_show", "Slot 8")
+            ),
+
+
             selectizeInput("add_sensor_dropdown", "Add a slot w/ sensor", choices = c("", "pH", "pH/ORP", "ORP", "Conductivity/Temperature", "Conductivity", "Turbidity", "Temperature", "DO", "Depth", "Nitrate", "Ammonium", "Chloride" , "DOM", "Rhodamine", "Total algae")),
             textInput("new_sensor_serial", "Serial number", ""),
             textOutput("add_sensor_note"),
@@ -100,8 +119,14 @@ app_ui <- function(request) {
               textInput("observer", label = "Calibrator name", value = ""),
               shinyWidgets::airDatepickerInput("obs_datetime", label = "Calibration date/time", value = .POSIXct(Sys.time(), tz = "MST"), range = FALSE, multiple = FALSE, timepicker = TRUE, maxDate = Sys.Date()+1, startView = Sys.Date(), update_on = "close", timepickerOpts = shinyWidgets::timepickerOptions(minutesStep = 15, timeFormat = "HH:mm")),
               textOutput("instrument_reminder"),
-              selectizeInput("ID_sensor_holder", label = "Logger/bulkhead/sonde serial #", choices = ""),
-              selectizeInput("ID_handheld_meter", label = "Handheld serial # (if applicable)", choices = "NA"),
+              div(
+                selectizeInput("ID_sensor_holder", label = "Logger/bulkhead/sonde serial #", choices = ""),
+                style = "color: white; background-color: blue;"
+              ),
+              div(
+                selectizeInput("ID_handheld_meter", label = "Handheld serial # (if applicable)", choices = "NA"),
+                style = "color: white; background-color: green;"
+              ),
               actionButton("save_basic_info", "Save this sheet")
             )
           ),
@@ -193,10 +218,10 @@ app_ui <- function(request) {
             condition = "input.first_selection == 'Calibrate'",
             conditionalPanel(
               condition = "input.selection == 'DO calibration'",
-              numericInput("baro_press_pre", label = "Baro Pressure Pre-Cal", value = ""),
-              numericInput("baro_press_post", label = "Baro Pressure Post-Cal", value = ""),
-              numericInput("DO_pre_prct", label = "DO Pre-Cal %", value = ""),
-              numericInput("DO_post_prct", label = "DO Post-Cal %", value = ""),
+              numericInput("baro_press_pre", label = "Baro Pressure Pre-Cal (mmHg)", value = ""),
+              numericInput("baro_press_post", label = "Baro Pressure Post-Cal (mmHg)", value = ""),
+              numericInput("DO_pre_prct", label = "DO Pre-Cal % LOCAL", value = ""),
+              numericInput("DO_post_prct", label = "DO Post-Cal % LOCAL", value = ""),
               actionButton("calc_abs_DO", "Calculate mg/l values"),
               actionButton("calc_prct_DO", "Calculate % values"),
               numericInput("DO_pre", label = "DO Pre-Cal mg/l", value = ""),
@@ -238,7 +263,7 @@ app_ui <- function(request) {
           ),
           conditionalPanel(
             condition = "input.first_selection == 'Manage sensors and log maintenance'",
-            tableOutput("instrument_details"), #This table will show up first to allow the user to select the right instrument
+            DT::dataTableOutput("manage_sensors_table"), #hidden once the user loads a specific instrument's sensors
             DT::dataTableOutput("sensor1_details"), # this and subsequent sensors are hidden until the user selects to view
             DT::dataTableOutput("sensor2_details"),
             DT::dataTableOutput("sensor3_details"),
@@ -274,7 +299,7 @@ golem_add_external_resources <- function() {
   )
 
   tags$head(
-    favicon(),
+    favicon(ext = "png"),
     bundle_resources(
       path = app_sys("app/www"),
       app_title = "WRBcalibrates"
