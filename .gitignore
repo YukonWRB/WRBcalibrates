@@ -4,6 +4,4 @@
 .httr-oauth
 .DS_Store
 .secrets
-inst/doc
-/doc/
-/Meta/
+rsconnect/
