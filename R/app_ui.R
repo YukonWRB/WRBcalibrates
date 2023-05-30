@@ -90,7 +90,7 @@ app_ui <- function(request) {
             ),
 
 
-            selectizeInput("add_sensor_dropdown", "Add a slot w/ sensor", choices = c("", "pH", "pH/ORP", "ORP", "Conductivity/Temperature", "Conductivity", "Turbidity", "Temperature", "DO", "Depth", "Nitrate", "Ammonium", "Chloride" , "DOM", "Rhodamine", "Total algae")),
+            selectizeInput("add_sensor_dropdown", "Add a slot w/ sensor", choices = c("", "pH", "pH/ORP", "ORP", "Conductivity/Temperature", "Conductivity", "Turbidity", "Temperature", "DO", "Depth", "Nitrate", "Ammonium", "Chloride" , "DOM", "Rhodamine", "Total algae", "Central Wiper")),
             textInput("new_sensor_serial", "Serial number", ""),
             textOutput("add_sensor_note"),
             textInput("add_sensor_name", "What's your name?", value = ""),
@@ -251,7 +251,9 @@ app_ui <- function(request) {
             condition = "input.first_selection == 'Calibrate'",
             DT::dataTableOutput("calibration_instruments_table"),
             tableOutput("restart_table"),
-            tableOutput("saved")
+            tableOutput("saved"),
+            textOutput("pH_mV_note"),
+            textOutput("ORP_molarity_note")
           ),
           conditionalPanel(
             condition = "input.first_selection == 'View unfinished calibrations'",
@@ -272,7 +274,7 @@ app_ui <- function(request) {
             DT::dataTableOutput("sensor6_details"),
             DT::dataTableOutput("sensor7_details"),
             DT::dataTableOutput("sensor8_details"),
-            selectInput("change_sensor", "Assign a new sensor", choices = c("", "pH", "pH/ORP", "ORP", "Conductivity/Temperature", "Conductivity", "Turbidity", "Temperature", "DO", "Depth", "Nitrate", "Ammonium", "Chloride" , "DOM", "Rhodamine", "Total algae")),
+            selectInput("change_sensor", "Assign a new sensor", choices = c("", "pH", "pH/ORP", "ORP", "Conductivity/Temperature", "Conductivity", "Turbidity", "Temperature", "DO", "Depth", "Nitrate", "Ammonium", "Chloride" , "DOM", "Rhodamine", "Total algae", "Central Wiper")),
             textInput("add_sensor_serial", "Serial number", ""),
             textAreaInput("add_comment", "Add a note", "", height = "100px"),
             textInput("add.change_sensor.comment_name", "What's your name?"),

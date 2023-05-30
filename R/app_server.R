@@ -260,6 +260,14 @@ table.on("click", "tr", function() {
   output$add_sensor_note <- renderText({
     messages$add_sensor_note
   })
+  messages$pH_mV_note <- "pH mV standards:   pH7 = +- 50;   pH4 = pH 7 value + 165 to 180;   pH 10 = pH 7 value - 165 to 180"
+  output$pH_mV_note <- renderText({
+    messages$pH_mV_note
+  })
+  messages$ORP_molarity_note <-"If using combination pH/ORP electrode adjust pH first.   Use proper standard scale: YSI Pro Series use 3.5M KCl scale, YSI sondes use 4M KCl scale."
+  output$ORP_molarity_note <- renderText({
+    messages$ORP_molarity_note
+  })
 
   #Create the reset functions
   reset_basic <- function(keep_observer = FALSE){
@@ -1663,6 +1671,14 @@ table.on("click", "tr", function() {
     }
   }, ignoreInit = TRUE)
 
+  observe( #Updates the SPC or non-spc values based on reference temperature input$spc_or_not changing
+    if (input$spc_or_not){
+      post_condy_val <-input$SpC2_std/(1+0.02*(calibration_data$temp$temp_reference - 25))
+      updateNumericInput(session, "SpC2_post", value = round(post_condy_val, 0))
+    } else {
+      updateNumericInput(session, "SpC2_post", value = input$SpC2_std)
+    }
+  )
 
   #Function to simplify DO calculated fields later on
   DO_calc <- function(pre_post, prct_abs, messages = TRUE){
@@ -2049,7 +2065,17 @@ table.on("click", "tr", function() {
     } else {
       shinyjs::hide("calibration_instruments_table")
     }
-  }, ignoreInit = TRUE)
+    if (input$selection == "pH calibration" & input$first_selection == "Calibrate"){
+      shinyjs::show("pH_mV_note")
+    } else {
+      shinyjs::hide("pH_mV_note")
+    }
+    if (input$selection == "ORP calibration" & input$first_selection == "Calibrate"){
+      shinyjs::show("ORP_molarity_note")
+    } else {
+      shinyjs::hide("ORP_molarity_note")
+    }
+  })
 
   ### Save basic info
   observeEvent(input$save_basic_info, {
