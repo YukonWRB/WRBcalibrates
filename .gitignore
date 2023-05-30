@@ -5,3 +5,5 @@
 .DS_Store
 .secrets
 rsconnect/
+/doc/
+/Meta/

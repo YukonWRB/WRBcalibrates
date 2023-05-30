@@ -10,6 +10,7 @@ vignette: >
 ---
 
 ```{r setup, include = FALSE}
+# You should be modifying this vignette from the .Rmd document in the /vignettes folder, NOT the .RMD in the /doc folder.
 knitr::opts_chunk$set(
   collapse = TRUE,
   comment = "#>"
@@ -20,12 +21,12 @@ library(WRBcalibrates)
 
 Important note regarding this vignette: if you are reading this in an HTML, Word or PDF document from the package folder on the G drive and wish to update the document, please do so via the vignette R Markdown document and re-publish/overwrite the document. The R Markdown document should be the ultimate source of truth regarding this R package and associated Shiny application. Instructions on how to do so are provided in the vignette Markdown document.
 
-This vignette may also come to contain R code and links to other documentation. For best performance and to ensure that all links function, it is recommended to view this vignette from within R Studio. You can view all package vignettes with 'vignette(package = "WRBcalibrates")' or this particular vignette with 'vignette(topic = "WRBcalibrates_guide")'.
+This vignette may also come to contain R code and links to other documentation. For best performance and to ensure that all links function, it is recommended to view this vignette from within R Studio. You can view all package vignettes with 'vignette(package = "WRBcalibrates")' or this particular vignette with 'vignette(topic = "WRBcalibrates_guide")'. Note however that vignettes may not have been installed, depending on the method you used to install the package. 
 
 ```{r vignette building comments, eval=FALSE, include=FALSE}
-# You should be modifying this vignette from the .Rmd document in the /vignettes folder, not the .RMD in the /doc folder.
+# You should be modifying this vignette from the .Rmd document in the /vignettes folder, NOT the .RMD in the /doc folder.
 # To have this vignette updated on the G drive, uncomment and run the following code *after* re-building the vignette using devtools::build_vignettes()
-# file.copy(from = paste0(getwd(), "/WRBcalibrates_guide.html"), to = "//env-fs/env-data/corp/water/Common_GW_SW/R-packages/WRBcalibrates/WRBcalibrates user guide.html", overwrite = TRUE)
+# file.copy(from = paste0(dirname(getwd()), "/doc/WRBcalibrates_guide.html"), to = "//env-fs/env-data/corp/water/Common_GW_SW/R-packages/WRBcalibrates/WRBcalibrates user guide.html", overwrite = TRUE)
 ```
 
 # Introduction
