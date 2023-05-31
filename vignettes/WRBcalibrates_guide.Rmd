@@ -103,7 +103,7 @@ The application is already set up to work with an SQL database however; all that
 
 As mentioned previously, there is a function already made to create an SQLite database and its schema as part of the package: db_create(). With a modification to the initial database connection code, this code could create tables in any database type that understands SQL language. That said, the function can create an SQLite database from scratch, which isn't possible with server-type databases. For databases like PostgreSQL, Microsoft SQL Server, or other types, the database should first be initialized outside of R without any tables; once that's done, modify the function to connect to the database and run the dbExecute() statements to create tables and establish relationships.
 
-Remember also to update the calConnect() function; it is currently set up to connect to an SQLite database on the G/Common_GW_SW folder, which will no longer be appropriate.
+If you opt to work with a database type other than SQLite or if the path to the database changes from the default G drive path, you must remember to update the calConnect() function. It is currently set up to connect to an SQLite database on the G/Common_GW_SW folder, which will no longer be appropriate.
 
 # Future improvements
 

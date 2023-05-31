@@ -4,50 +4,38 @@
 # WRBcalibrates
 
 <!-- badges: start -->
+
+[![Lifecycle:
+stable](https://img.shields.io/badge/lifecycle-stable-brightgreen.svg)](https://lifecycle.r-lib.org/articles/stages.html#stable)
+
 <!-- badges: end -->
 
-The goal of WRBcalibrates is to …
+WRBcalibrates is a package to aid the Yukon Water Resources Branch in
+collecting and storing calibration data.
 
 ## Installation
 
-You can install the development version of WRBcalibrates like so:
+You can install the development version of WRBcalibrates from GitHub
+using the code below. Note however that the repository is private;
+you’ll need to be a member of YukonWRB or have a token issued for you by
+a member.
 
 ``` r
-# FILL THIS IN! HOW CAN PEOPLE INSTALL YOUR DEV PACKAGE?
+devtools::install.github("YukonWRB/WRBcalibrates")
 ```
 
-## Example
+Stable/production versions of the package are available on the G drive
+at: G:\_GW_SW-packages.
 
-This is a basic example which shows you how to solve a common problem:
+## Data storage back-end
 
-``` r
-library(WRBcalibrates)
-## basic example code
-```
-
-What is special about using `README.Rmd` instead of just `README.md`?
-You can include R chunks like so:
-
-``` r
-summary(cars)
-#>      speed           dist       
-#>  Min.   : 4.0   Min.   :  2.00  
-#>  1st Qu.:12.0   1st Qu.: 26.00  
-#>  Median :15.0   Median : 36.00  
-#>  Mean   :15.4   Mean   : 42.98  
-#>  3rd Qu.:19.0   3rd Qu.: 56.00  
-#>  Max.   :25.0   Max.   :120.00
-```
-
-You’ll still need to render `README.Rmd` regularly, to keep `README.md`
-up-to-date. `devtools::build_readme()` is handy for this. You could also
-use GitHub Actions to re-render `README.Rmd` every time you push. An
-example workflow can be found here:
-<https://github.com/r-lib/actions/tree/v1/examples>.
-
-You can also embed plots, for example:
-
-<img src="man/figures/README-pressure-1.png" width="100%" />
-
-In that case, don’t forget to commit and push the resulting figure
-files, so they display on GitHub and CRAN.
+The app is designed to work with either Google Sheets or with an SQL
+back-end. The package contains functions to create a local .SQLite
+database (db_create()), and the function calConnect() can be used to
+connect to the database. The logic behind creating a connection function
+instead of simply using DBI::dbConnect() is that, if the database type
+changes or if options need to be specified for the database connection,
+the default parameters of calConnect() can be changed and will
+automatically apply to every connection made via calConnect. Once
+connected, the database type does not matter as long as it accepts
+standard SQL language and is relational.
