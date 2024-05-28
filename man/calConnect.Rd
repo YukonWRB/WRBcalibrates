@@ -2,14 +2,27 @@
 % Please edit documentation in R/calConnect.R
 \name{calConnect}
 \alias{calConnect}
-\title{Connect to calibrations database}
+\title{Connect to the calibrations database}
 \usage{
-calConnect(path = "default", timeout = 1e+05, silent = FALSE)
+calConnect(
+  name = "calibrations",
+  host = Sys.getenv("calHost"),
+  port = Sys.getenv("calPort"),
+  username = Sys.getenv("calUser"),
+  password = Sys.getenv("calPass"),
+  silent = FALSE
+)
 }
 \arguments{
-\item{path}{The path to the database. 'default' points to "//env-fs/env-data/corp/water/Common_GW_SW/Data/calibrations/WRBcalibrates.sqlite".}
+\item{name}{Database name.}
 
-\item{timeout}{The duration in which to retry an operation in milliseconds. Valid for the duration of the connection.}
+\item{host}{Database host address. By default searches the .Renviron file for parameter:value pair of form calHost="hostname".}
+
+\item{port}{Connection port. By default searches the .Renviron file for parameter=value pair of form calPort="1234".}
+
+\item{username}{Username. By default searches the .Renviron file for parameter=value pair of form calUser="username". Refrain from using username with write privileges unless you absolutely know what you're doing.}
+
+\item{password}{Password. By default searches the .Renviron file for parameter=value pair of form calPass="password".}
 
 \item{silent}{TRUE suppresses messages except for errors.}
 }
@@ -17,7 +30,7 @@ calConnect(path = "default", timeout = 1e+05, silent = FALSE)
 A connection to the database.
 }
 \description{
-\ifelse{html}{\href{https://lifecycle.r-lib.org/articles/stages.html#experimental}{\figure{lifecycle-experimental.svg}{options: alt='[Experimental]'}}}{\strong{[Experimental]}}
+\ifelse{html}{\href{https://lifecycle.r-lib.org/articles/stages.html#stable}{\figure{lifecycle-stable.svg}{options: alt='[Stable]'}}}{\strong{[Stable]}}
 
-This function exists to facilitate connecting to the calibrations database. Cannot be used to create a new database, use \code{\link[DBI:dbConnect]{DBI::dbConnect()}} with the appropriate driver (e.g. \code{\link[RSQLite:SQLite]{RSQLite::SQLite()}}) for that purpose.
+This function exists to facilitate connecting to the calibrations database.
 }

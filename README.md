@@ -23,19 +23,3 @@ a member.
 ``` r
 devtools::install.github("YukonWRB/WRBcalibrates")
 ```
-
-Stable/production versions of the package are available on the G drive
-at: G:\_GW_SW-packages.
-
-## Data storage back-end
-
-The app is designed to work with either Google Sheets or with an SQL
-back-end. The package contains functions to create a local .SQLite
-database (db_create()), and the function calConnect() can be used to
-connect to the database. The logic behind creating a connection function
-instead of simply using DBI::dbConnect() is that, if the database type
-changes or if options need to be specified for the database connection,
-the default parameters of calConnect() can be changed and will
-automatically apply to every connection made via calConnect. Once
-connected, the database type does not matter as long as it accepts
-standard SQL language and is relational.

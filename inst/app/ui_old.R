@@ -4,6 +4,8 @@
 #'     DO NOT REMOVE.
 #' @import shiny
 #' @noRd
+
+
 app_ui <- function(request) {
   #set up for background color when validating calibrations
   jsCode <- '
@@ -19,17 +21,14 @@ app_ui <- function(request) {
     }'
 
   tagList(
-    # Leave this function for adding external resources
-    golem_add_external_resources(),
-    # Your application UI logic
     fluidPage(
+      shinyjs::useShinyjs(),
       tags$head(
         tags$meta(name = "viewport", content = "width=device-width, initial-scale=1"),
-        tags$link(rel = "manifest", href = "manifest.json"),
         tags$link(rel = "apple-touch-icon", href = "app-icon.png"),
         tags$link(rel = "icon", type = "image/png", href = "app-icon.png"),
         tags$script(src = "serviceworker.js", type = "text/javascript"),
-        tags$style(type='text/css', ".selectize-dropdown-content {max-height: 400px; }"),
+        tags$style(type = 'text/css', ".selectize-dropdown-content {max-height: 400px; }"),
         tags$style(
           HTML(
             ".load_sensors_btn .btn {
@@ -49,6 +48,7 @@ app_ui <- function(request) {
 
       # Title
       titlePanel("Instrument Calibration and Tracking"),
+
       # Broad category selection
       selectInput("first_selection", label = "Choose a task", choices = c("Calibrate", "Manage instruments", "Manage sensors and log maintenance", "View unfinished calibrations"#, "View completed calibrations"
       )),
@@ -59,10 +59,10 @@ app_ui <- function(request) {
             condition = "input.first_selection == 'Manage instruments'",
             selectInput("existing_serial_no", "Search existing serial numbers", choices = "New record"),
             textInput("serial_no", "New serial no (add alias by appending to serial #, e.g. 012345Blue)", value = "Search first!"),
-            textInput("recorder", label = "Observer name", value = ""),
-            selectInput("make", label = "Instrument make", choices = c("", "YSI", "Solinst", "HOBO/Onset", "OTT", "RBR", "Campbell Sci", "In-Situ", "Other"), ),
-            textInput("model", label = "Instrument model", value = ""),
-            selectInput("type", label = "Instrument type", choices = c("", "Logger (single/multi-param deployable, fixed sensors)", "Sonde (multi-param deployable, interchangeable sensors)", "Bulkhead (requires handheld, not deployable)", "Handheld (connects to bulkhead)", "Sensor (single/multi-param not deployable i.e. thermometer or combo meter")), #beware if changing names that 'Handheld (connects to bulkhead)' is employed in app_server
+            selectInput("recorder", label = "Observer name", choices = "placeholder"),
+            selectInput("make", label = "Instrument make", choices = "placeholder", ),
+            selectInput("model", label = "Instrument model", choices = "placeholder"),
+            selectInput("type", label = "Instrument type", choices = "placeholder"), #beware if changing names that 'Handheld (connects to bulkhead)' is employed in app_server
             textInput("asset_tag", "Asset tag number", value = ""),
             dateInput("date_in_service", label = "Date in service"),
             dateInput("date_purchased", label = "Date purchased"),
@@ -93,7 +93,7 @@ app_ui <- function(request) {
             selectizeInput("add_sensor_dropdown", "Add a slot w/ sensor", choices = c("", "pH", "pH/ORP", "ORP", "Conductivity/Temperature", "Conductivity", "Turbidity", "Temperature", "DO", "Depth", "Nitrate", "Ammonium", "Chloride" , "DOM", "Rhodamine", "Total algae", "Central Wiper")),
             textInput("new_sensor_serial", "Serial number", ""),
             textOutput("add_sensor_note"),
-            textInput("add_sensor_name", "What's your name?", value = ""),
+            selectInput("add_sensor_name", "What's your name?", choices = "placeholder"),
             actionButton("add_sensor", "Submit")
           ),
           conditionalPanel(
@@ -116,17 +116,11 @@ app_ui <- function(request) {
                         choices = c("Basic calibration info", "Temperature calibration", "Conductivity calibration", "pH calibration", "ORP calibration", "Turbidity calibration", "DO calibration", "Depth calibration")),
             conditionalPanel(
               condition = "input.selection == 'Basic calibration info'",
-              textInput("observer", label = "Calibrator name", value = ""),
-              shinyWidgets::airDatepickerInput("obs_datetime", label = "Calibration date/time", value = .POSIXct(Sys.time(), tz = "MST"), range = FALSE, multiple = FALSE, timepicker = TRUE, maxDate = Sys.Date()+1, startView = Sys.Date(), update_on = "close", timepickerOpts = shinyWidgets::timepickerOptions(minutesStep = 15, timeFormat = "HH:mm")),
+              uiOutput("observer"),
+              shinyWidgets::airDatepickerInput("obs_datetime", label = "Calibration date/time", value = Sys.time(), range = FALSE, multiple = FALSE, timepicker = TRUE, maxDate = Sys.Date() + 1, startView = Sys.Date(), update_on = "close", timepickerOpts = shinyWidgets::timepickerOptions(minutesStep = 15, timeFormat = "HH:mm")),
               textOutput("instrument_reminder"),
-              div(
-                selectizeInput("ID_sensor_holder", label = "Logger/bulkhead/sonde serial #", choices = ""),
-                style = "color: white; background-color: blue;"
-              ),
-              div(
-                selectizeInput("ID_handheld_meter", label = "Handheld serial # (if applicable)", choices = "NA"),
-                style = "color: white; background-color: green;"
-              ),
+              uiOutput("ID_sensor_holder"),
+              uiOutput("ID_handheld_meter"),
               actionButton("save_basic_info", "Save this sheet")
             )
           ),
@@ -277,37 +271,11 @@ app_ui <- function(request) {
             selectInput("change_sensor", "Assign a new sensor", choices = c("", "pH", "pH/ORP", "ORP", "Conductivity/Temperature", "Conductivity", "Turbidity", "Temperature", "DO", "Depth", "Nitrate", "Ammonium", "Chloride" , "DOM", "Rhodamine", "Total algae", "Central Wiper")),
             textInput("add_sensor_serial", "Serial number", ""),
             textAreaInput("add_comment", "Add a note", "", height = "100px"),
-            textInput("add.change_sensor.comment_name", "What's your name?"),
+            uiOutput("add.change_sensor.comment_name"),
             actionButton("add.change_sensor.comment", "Submit new record")
           )
         )
       )
     )
-  )
-}
-
-#' Add external Resources to the Application
-#'
-#' This function is internally used to add external
-#' resources inside the Shiny application.
-#'
-#' @import shiny
-#' @importFrom golem add_resource_path activate_js favicon bundle_resources
-#' @noRd
-golem_add_external_resources <- function() {
-  add_resource_path(
-    "www",
-    app_sys("app/www")
-  )
-
-  tags$head(
-    favicon(ext = "png"),
-    bundle_resources(
-      path = app_sys("app/www"),
-      app_title = "WRBcalibrates"
-    ),
-    # Add here other external resources
-    # for example, you can add shinyalert::useShinyalert()
-    shinyjs::useShinyjs()
   )
 }
