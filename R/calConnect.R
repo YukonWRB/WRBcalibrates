@@ -1,32 +1,33 @@
-#' Connect to calibrations database
+#' Connect to the calibrations database
 #'
 #' @description
-#' `r lifecycle::badge("experimental")`
+#' `r lifecycle::badge("stable")`
 #'
-#' This function exists to facilitate connecting to the calibrations database. Cannot be used to create a new database, use [DBI::dbConnect()] with the appropriate driver (e.g. [RSQLite::SQLite()]) for that purpose.
+#' This function exists to facilitate connecting to the calibrations database.
 #'
-#' @param path The path to the database. 'default' points to "//env-fs/env-data/corp/water/Common_GW_SW/Data/calibrations/WRBcalibrates.sqlite".
-#' @param timeout The duration in which to retry an operation in milliseconds. Valid for the duration of the connection.
+#' @param name Database name.
+#' @param host Database host address. By default searches the .Renviron file for parameter:value pair of form calHost="hostname".
+#' @param port Connection port. By default searches the .Renviron file for parameter=value pair of form calPort="1234".
+#' @param username Username. By default searches the .Renviron file for parameter=value pair of form calUser="username". Refrain from using username with write privileges unless you absolutely know what you're doing.
+#' @param password Password. By default searches the .Renviron file for parameter=value pair of form calPass="password".
 #' @param silent TRUE suppresses messages except for errors.
 #'
 #' @return A connection to the database.
+#'
 #' @export
+#'
 
-calConnect <- function(path = "default", timeout = 100000, silent = FALSE){
-
-  if (path == "default"){
-    path <- "//env-fs/env-data/corp/water/Common_GW_SW/Data/calibrations/WRBcalibrates.sqlite"
-  }
-
-  if(!file.exists(path)){
-    stop("The path you specified either does not exist or this computer does not have access to that drive.")
-  }
+calConnect <- function(name = "calibrations", host = Sys.getenv("calHost"), port = Sys.getenv("calPort"), username = Sys.getenv("calUser"), password = Sys.getenv("calPass"), silent = FALSE){
 
   tryCatch({
-    cal <- DBI::dbConnect(RSQLite::SQLite(), path)
-    DBI::dbExecute(cal, paste0("PRAGMA busy_timeout=", timeout))
-    if (!silent){
-      print("Remember to disconnect using DBI::dbDisconnect() when finished.")
+    cal <- DBI::dbConnect(drv = RPostgres::Postgres(),
+                            dbname = name,
+                            host = host,
+                            port = port,
+                            user = username,
+                            password = password)
+    if (!silent) {
+      message("Remember to disconnect using DBI::dbDisconnect() when finished.")
     }
     return(cal)
   }, error = function(e){

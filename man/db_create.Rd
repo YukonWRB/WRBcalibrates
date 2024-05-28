@@ -4,20 +4,22 @@
 \alias{db_create}
 \title{Initial calibration database creation}
 \usage{
-db_create(path, overwrite = FALSE)
+db_create(con = calConnect(), overwrite = FALSE)
 }
 \arguments{
-\item{path}{The path to the calibration SQLite database or the location where it should be created, with extension. Refer to calConnect for the default path refered to in that function as it may be appropriate to use here.}
+\item{con}{A connection to the target database}
 
 \item{overwrite}{TRUE overwrites the database, if one exists in the same path.}
 }
 \value{
-An SQLite database in the folder location specified by 'path'.
+New tables in the target postgres database.
 }
 \description{
 #' @description
 \ifelse{html}{\href{https://lifecycle.r-lib.org/articles/stages.html#experimental}{\figure{lifecycle-experimental.svg}{options: alt='[Experimental]'}}}{\strong{[Experimental]}}
 }
 \details{
-Creates an SQLite database or replaces an existing database designed to hold instrument calibration data.
+Populates a postgres database with the necessary tables for the calibration app. A database should be created before using this function, but it can be left empty.
+
+This function will also establish a mapping to the 'hydromet' database, which is used to populate the 'locations' table.
 }
