@@ -28,10 +28,8 @@ app_ui <- function(request) {
       shinyjs::useShinyjs(),
       tags$head(
         tags$meta(name = "viewport", content = "width=device-width, initial-scale=1"),
-        tags$link(rel = "manifest", href = "manifest.json"),
         tags$link(rel = "apple-touch-icon", href = "app-icon.png"),
         tags$link(rel = "icon", type = "image/png", href = "app-icon.png"),
-        tags$script(src = "serviceworker.js", type = "text/javascript"),
         tags$style(type = 'text/css', ".selectize-dropdown-content {max-height: 400px; }"),
         tags$style(
           HTML(

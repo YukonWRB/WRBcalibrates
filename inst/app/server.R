@@ -360,7 +360,7 @@ table.on("click", "tr", function() {
     }
   }, ignoreInit = TRUE)
 
-  # Render messages and notes ################################################
+  # Render messages and notes, show/hide messages based on selection ################################################
   messages$instrument_reminder <- "Add your instrument if not listed!"
   messages$add_sensor_note <- "Caution: adds new sensor slot. To change sensor type, click on it for new options."
 
@@ -390,6 +390,33 @@ table.on("click", "tr", function() {
   messages$ORP_molarity_note <- "<b><br><br>If using combination pH/ORP electrode adjust pH first.<br><br>Use proper standard scale: YSI Pro Series use 3.5M KCl scale, YSI sondes use 4M KCl scale.</b>"
   output$ORP_molarity_note <- renderUI({
     HTML(messages$ORP_molarity_note)
+  })
+
+  observeEvent(input$selection, {
+    if (input$selection == "Basic calibration info") {
+      instruments_data$manage_instruments <- instruments_data$sheet[ , !colnames(instruments_data$sheet) %in% c("instrument_ID", "observer", "obs_datetime", "holds_replaceable_sensors", "retired_by", "date_retired")]
+      output$calibration_instruments_table <- DT::renderDT({
+        DT::datatable(
+          instruments_data$manage_instruments,
+          rownames = FALSE,
+          selection = "multiple",
+          callback = htmlwidgets::JS(table_reset)
+        )
+      }, server = TRUE)
+      shinyjs::show("calibration_instruments_table")
+    } else {
+      shinyjs::hide("calibration_instruments_table")
+    }
+    if (input$selection == "pH calibration" & input$first_selection == "Calibrate") {
+      shinyjs::show("pH_mV_note")
+    } else {
+      shinyjs::hide("pH_mV_note")
+    }
+    if (input$selection == "ORP calibration" & input$first_selection == "Calibrate") {
+      shinyjs::show("ORP_molarity_note")
+    } else {
+      shinyjs::hide("ORP_molarity_note")
+    }
   })
 
   #Create reset functions for each calibration type ################################################
@@ -1589,6 +1616,8 @@ table.on("click", "tr", function() {
     }
   }, ignoreInit = TRUE)
 
+
+  # Restart a calibration ##############################################################################
   observeEvent(input$restart_calibration, {
     restart_value <- as.numeric(input$restart_index)
     if (restart_value == 0) {
@@ -1715,6 +1744,8 @@ table.on("click", "tr", function() {
     }
   }, ignoreInit = TRUE)
 
+
+  # Delete a calibration ##############################################################################
   observeEvent(input$delete_calibration, {
     delete_value <- as.numeric(input$restart_index)
     if (delete_value == 0) {
@@ -1763,6 +1794,8 @@ table.on("click", "tr", function() {
     }
   }, ignoreInit = TRUE)
 
+
+  # Update the SpC and DO fields ##########################################
   observeEvent(input$spc_or_not, {
     if (input$spc_or_not) {
       updateNumericInput(session, "SpC1_pre", label = "Conducvitity Low-Range Pre-Cal Value")
@@ -1779,7 +1812,7 @@ table.on("click", "tr", function() {
 
   observe( #Updates the SPC or non-spc values based on reference temperature input$spc_or_not changing
     if (input$spc_or_not) {
-      post_condy_val <-input$SpC2_std/(1+0.02*(calibration_data$temp$temp_reference - 25))
+      post_condy_val <- input$SpC2_std/(1+0.02*(calibration_data$temp$temp_reference - 25))
       updateNumericInput(session, "SpC2_post", value = round(post_condy_val, 0))
     } else {
       updateNumericInput(session, "SpC2_post", value = input$SpC2_std)
@@ -1790,7 +1823,7 @@ table.on("click", "tr", function() {
   DO_calc <- function(pre_post, prct_abs, messages = TRUE) {
     trigger_name <- if (pre_post == "pre" & prct_abs == "prct") "DO_pre_prct" else if (pre_post == "pre" & prct_abs == "abs") "DO_pre" else if (pre_post == "post" & prct_abs == "prct") "DO_post_prct" else if (pre_post == "post" & prct_abs == "abs") "DO_post"
     update_name <- if (pre_post == "pre" & prct_abs == "prct") "DO_pre" else if (pre_post == "pre" & prct_abs == "abs") "DO_pre_prct" else if (pre_post == "post" & prct_abs == "prct") "DO_post" else if (pre_post == "post" & prct_abs == "abs") "DO_post_prct"
-    baro_press <- if(pre_post == "pre") input$baro_press_pre else input$baro_press_post
+    baro_press <- if (pre_post == "pre") input$baro_press_pre else input$baro_press_post
     meas <- input[[trigger_name]]
     temp <- input$temp_observed
     go_baro <- FALSE
@@ -1857,6 +1890,8 @@ table.on("click", "tr", function() {
     }
   }, ignoreInit = TRUE)
 
+
+  # Validation checks ##############################################################################
   validation_check$pH <- FALSE
   observeEvent(input$validate_pH, { #Deal with the pH page
     tryCatch({
@@ -2158,36 +2193,8 @@ table.on("click", "tr", function() {
     })
   }, ignoreInit = TRUE)
 
-  observeEvent(input$selection, {
-    if (input$selection == "Basic calibration info") {
-      instruments_data$manage_instruments <- instruments_data$sheet[ , !colnames(instruments_data$sheet) %in% c("instrument_ID", "observer", "obs_datetime", "holds_replaceable_sensors", "retired_by", "date_retired")]
-      output$calibration_instruments_table <- DT::renderDT({
-        DT::datatable(
-          instruments_data$manage_instruments,
-          rownames = FALSE,
-          selection = "multiple",
-          callback = htmlwidgets::JS(table_reset)
-        )
-      }, server = TRUE)
-      shinyjs::show("calibration_instruments_table")
-    } else {
-      shinyjs::hide("calibration_instruments_table")
-    }
-    if (input$selection == "pH calibration" & input$first_selection == "Calibrate") {
-      shinyjs::show("pH_mV_note")
-    } else {
-      shinyjs::hide("pH_mV_note")
-    }
-    if (input$selection == "ORP calibration" & input$first_selection == "Calibrate") {
-      shinyjs::show("ORP_molarity_note")
-    } else {
-      shinyjs::hide("ORP_molarity_note")
-    }
-  })
-
   # Calibration data saving #########################################################
-
-  # Chastize the user if they try to move on without saving basic info
+  # Chastise the user if they try to move on without saving basic info
   observeEvent(input$selection, {
     if (input$selection != "Basic calibration info" & !complete$basic) {
       shinyalert::shinyalert(title = "Stop! You must save basic info first or load an incomplete calibration!", type = "error", timer = 2000)
@@ -2213,7 +2220,6 @@ table.on("click", "tr", function() {
       shinyalert::shinyalert(title = "Fill in the observer name", type = "error", timer = 2000)
       return()
     }
-
 
       dt <- input$obs_datetime
       id_sensor_holder <- instruments_data$sheet[instruments_data$sheet$serial_no == input$ID_sensor_holder, "instrument_id"]
@@ -2717,6 +2723,7 @@ table.on("click", "tr", function() {
   }, ignoreInit = TRUE)
 
 
+  ### Finalize calibration and submit #####################################
   observeEvent({input$submit_btn}, {
     if (!("Basic info" %in% send_table$saved[ ,1] | "Basic info" %in% send_table$restarted_cal[ ,1])) {
       shinyalert::shinyalert(title = "There is no basic information yet!!!", text = "Fill in your name, calibration time and date, and required serial numbers.", type = "error")
