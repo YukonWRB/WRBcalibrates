@@ -1,6 +1,6 @@
 app_ui <- function(request) {
   # Set up for background color when validating calibrations
-  jsCode <- '
+  instrSelectBGCol <- '
     shinyjs.backgroundCol = function(params) {
       var defaultParams = {
         id : null,
@@ -11,6 +11,17 @@ app_ui <- function(request) {
       var el = $("#" + params.id);
       el.css("background-color", params.col);
     }'
+
+#   restoreCalibrator <- "
+# Shiny.addCustomMessageHandler('setCalibratorName', function(name) {
+#   localStorage.setItem('calibratorName', name);
+# });
+#
+# Shiny.addCustomMessageHandler('getCalibratorName', function(message) {
+#   var name = localStorage.getItem('calibratorName');
+#   Shiny.onInputChange('storedCalibratorName', name);
+# });
+# "
 
   tagList(
     fluidPage(
@@ -38,7 +49,8 @@ app_ui <- function(request) {
           )
         )
       ),
-      shinyjs::extendShinyjs(text = jsCode, functions = c("backgroundCol")),
+      shinyjs::extendShinyjs(text = instrSelectBGCol, functions = c("backgroundCol")),
+      # shinyjs::extendShinyjs(text = restoreCalibrator, functions = c("setCalibratorName", "getCalibratorName")),
 
       # Title
       titlePanel("Instrument Calibration and Tracking"),
@@ -146,8 +158,8 @@ app_ui <- function(request) {
               ),
               conditionalPanel(
                 condition = "input.selection == 'Depth calibration'",
-                radioButtons(inputId = "depth_check_ok", label = "Depth Sensor Output Near 0 or as Expected in air?", choiceNames = c("FALSE", "TRUE"), choiceValues = c("FALSE", "TRUE")),
-                radioButtons(inputId = "depth_changes_ok", label = "Depth Sensor Output Changes as Expected with depth?", choiceNames = c("Not Checked", "FALSE", "TRUE"), choiceValues = c("Not Checked", "FALSE", "TRUE")),
+                radioButtons(inputId = "depth_check_ok", label = "Depth sensor output near 0 or as expected in air?", choiceNames = c("FALSE", "TRUE"), choiceValues = c("FALSE", "TRUE")),
+                radioButtons(inputId = "depth_changes_ok", label = "Depth sensor output changes as expected with depth?", choiceNames = c("Not Checked", "FALSE", "TRUE"), choiceValues = c("Not Checked", "FALSE", "TRUE")),
                 actionButton("validate_depth", "Validate measurements"),
                 actionButton("save_cal_depth", "Save this sheet"),
                 actionButton("delete_depth", "Delete this sheet")
@@ -157,8 +169,8 @@ app_ui <- function(request) {
               DT::dataTableOutput("calibration_instruments_table"),
               tableOutput("restart_table"),
               tableOutput("saved"),
-              textOutput("pH_mV_note"),
-              textOutput("ORP_molarity_note")
+              htmlOutput("pH_mV_note"),
+              htmlOutput("ORP_molarity_note")
             )
           )
         ),

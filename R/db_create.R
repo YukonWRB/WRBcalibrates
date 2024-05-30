@@ -85,6 +85,8 @@ DBI::dbExecute(con, "CREATE TABLE observers (
                  observer_id SERIAL PRIMARY KEY,
                  observer_first TEXT NOT NULL,
                  observer_last TEXT NOT NULL
+                 organization TEXT NOT NULL,
+                 UNIQUE (observer_first, observer_last, organization)
                  )
                  ;")
 
@@ -312,8 +314,8 @@ DBI::dbExecute(con, "COMMENT ON TABLE array_maintenance_changes IS 'This table i
   DBI::dbExecute(con,
                  "CREATE TABLE calibrate_depth (
                   calibration_id INTEGER NOT NULL,
-                  depth_check_ok NUMERIC NOT NULL,
-                  depth_changes_ok NUMERIC NOT NULL,
+                  depth_check_ok BOOLEAN NOT NULL,
+                  depth_changes_ok BOOLEAN,
                   PRIMARY KEY (calibration_id),
                   FOREIGN KEY (calibration_id) REFERENCES calibrations(calibration_id) ON UPDATE CASCADE ON DELETE CASCADE
                  )

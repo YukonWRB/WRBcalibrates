@@ -10,7 +10,7 @@ app_server <- function(input, output, session) {
 var colors = ["blue", "green"];
 var stack = [];
 table.on("click", "tr", function() {
-  var $rows = $("#calibration_instruments_table tbody tr"); // SIMONSIMON change the name of the table here
+  var $rows = $("#calibration_instruments_table tbody tr"); // change the name of the table here
   var $row = $(this);
   var idx = $row.index();
   if($row.hasClass("selected")) {
@@ -35,12 +35,24 @@ table.on("click", "tr", function() {
 });
 '
 
+  # Logic to save and fetch field entries from the user's browser ################################################
+  # observeEvent(input$observer, {
+  #   js$setCalibratorName(input$observer)
+  # })
+  #
+  # observe({
+  #   session$sendCustomMessage(type = 'getCalibratorName', message = '')
+  # })
+
+
+
   # Initial show/hide and creation of containers ################################################
   # create a few containers
   validation_check <- reactiveValues()
   calibration_data <- reactiveValues()
   calibration_data$restarted_id <- 0
   restarted <- reactiveValues()
+  restarted$initialized <- FALSE
   restarted$restarted <- FALSE
   instruments_data <- reactiveValues()
   select_data <- reactiveValues()  # Holds data to populate select menus
@@ -132,7 +144,8 @@ table.on("click", "tr", function() {
   instruments_data$maintainable <- instruments_sheet[instruments_sheet$type %in% c("Sonde", "Bulkhead") , ]
 
   observe({
-    select_data$recorder <- setNames(c(instruments_data$observers$observer_id, "new"), c(paste0(instruments_data$observers$observer_first, " ", instruments_data$observers$observer_last), "Add new observer"))
+    instruments_data$observers$observer_string <- paste0(instruments_data$observers$observer_first, " ", instruments_data$observers$observer_last, " (", instruments_data$observers$organization, ")")
+    select_data$recorder <- setNames(c(instruments_data$observers$observer_id, "new"), c(instruments_data$observers$observer_string, "Add new observer"))
     select_data$makes <- setNames(c(instruments_data$makes$make_id, "new"), c(instruments_data$makes$make, "Add new make"))
     select_data$models <- setNames(c(instruments_data$models$model_id, "new"), c(instruments_data$models$model, "Add new model"))
     select_data$types <- setNames(c(instruments_data$types$type_id, "new"), c(instruments_data$types$type, "Add new type"))
@@ -154,27 +167,43 @@ table.on("click", "tr", function() {
     output$add.change_sensor.comment_name <- renderUI({
       selectInput("add.change_sensor.comment_name", label = "Observer name", choices = select_data$recorder)
     })
+
+    if (!restarted$initialized) {
+      # Create initial table for managing instruments and incomplete calibrations
+      initial_manage_instruments_table <- instruments_sheet[is.na(instruments_sheet$date_retired), !colnames(instruments_sheet) %in% c("instrument_id", "observer", "obs_datetime", "holds_replaceable_sensors", "retired_by", "date_retired")]
+      output$manage_instruments_table <- DT::renderDataTable(initial_manage_instruments_table, rownames = FALSE, selection = "single")
+
+      incomplete_calibrations <- calibrations[calibrations$complete == FALSE, ] # find out if any calibrations are labelled as incomplete
+      if (nrow(incomplete_calibrations) > 0) {
+        shinyalert::shinyalert(title = "Incomplete calibrations found!", text = "Go to to the page 'View unfinished calibrations' to restart or delete them.")
+        incomplete_calibrations <- dplyr::left_join(incomplete_calibrations, instruments_data$observers[, c("observer_id", "observer_string")], by = dplyr::join_by(observer == observer_id))
+        complete$incomplete <- data.frame("Index" = seq(1, nrow(incomplete_calibrations)),
+                                          "Calibrator" = as.vector(incomplete_calibrations$observer_string),
+                                          "Date/time UTC" = incomplete_calibrations$obs_datetime,
+                                          check.names = FALSE)
+      } else {
+        # Make a data.frame with no calibrations
+        complete$incomplete <- data.frame("Index" = 0,
+                                          "Calibrator" = "No unsaved calibrations!",
+                                          "Date/Time UTC" = "No unsaved calibrations!",
+                                          check.names = FALSE)
+      }
+
+      output$calibration_instruments_table <- DT::renderDataTable({
+        DT::datatable(
+          initial_manage_instruments_table,
+          rownames = FALSE,
+          selection = "multiple",
+          callback = htmlwidgets::JS(table_reset)
+        )
+      }, server = TRUE)
+
+      restarted$initialized <- TRUE
+    }
+
   })
 
-  # Create initial table for managing instruments and incomplete calibrations
-  initial_manage_instruments_table <- instruments_sheet[is.na(instruments_sheet$date_retired), !colnames(instruments_sheet) %in% c("instrument_id", "observer", "obs_datetime", "holds_replaceable_sensors", "retired_by", "date_retired")]
-  output$manage_instruments_table <- DT::renderDataTable(initial_manage_instruments_table, rownames = FALSE, selection = "single")
 
-
-  incomplete_calibrations <- calibrations[calibrations$complete == FALSE, ] # find out if any calibrations are labelled as incomplete
-  if (nrow(incomplete_calibrations) > 0) {
-    shinyalert::shinyalert(title = "Incomplete calibrations found!", text = "Go to to the page 'View unfinished calibrations' to restart or delete them.")
-    complete$incomplete <- data.frame("Index" = seq(1, nrow(incomplete_calibrations)),
-                                      "Calibrator" = as.vector(incomplete_calibrations$observer),
-                                      "Date/time UTC" = incomplete_calibrations$obs_datetime,
-                                      check.names = FALSE)
-  } else {
-    # Make a data.frame with no calibrations
-    complete$incomplete <- data.frame("Index" = 0,
-                                      "Calibrator" = "No unsaved calibrations!",
-                                      "Date/Time UTC" = "No unsaved calibrations!",
-                                      check.names = FALSE)
-  }
 
 
   # Modals and observers to add new observers, makes, models, types to the DB ########################################
@@ -184,6 +213,7 @@ table.on("click", "tr", function() {
       showModal(modalDialog(title = "Add new observer",
                             textInput("new_observer_first", "First name"),
                             textInput("new_observer_last", "Last name"),
+                            textInput("new_observer_org", "Organization"),
                             actionButton("add_new_observer", "Add new observer")
                             ))
     }
@@ -194,6 +224,7 @@ table.on("click", "tr", function() {
       showModal(modalDialog(title = "Add new observer",
                             textInput("new_observer_first", "First name"),
                             textInput("new_observer_last", "Last name"),
+                            textInput("new_observer_org", "Organization"),
                             actionButton("add_new_observer", "Add new observer")
       ))
     }
@@ -204,9 +235,9 @@ table.on("click", "tr", function() {
       shinyalert::shinyalert(title = "Error", text = "Please enter both a first and last name.")
       return()
     }
-    DBI::dbExecute(pool, paste0("INSERT INTO observers (observer_first, observer_last) VALUES ('", input$new_observer_first, "', '", input$new_observer_last, "')"))
+    DBI::dbExecute(pool, paste0("INSERT INTO observers (observer_first, observer_last, organization) VALUES ('", input$new_observer_first, "', '", input$new_observer_last, "', '", input$new_observer_org, "')"))
     instruments_data$observers <- DBI::dbGetQuery(pool, "SELECT * FROM observers")
-    select_data$recorder <- setNames(c(instruments_data$observers$observer_id, "new"), c(paste0(instruments_data$observers$observer_first, " ", instruments_data$observers$observer_last), "Add new observer"))
+    select_data$recorder <- setNames(c(instruments_data$observers$observer_id, "new"), c(instruments_data$observers$observer_string, "Add new observer"))
     output$observer <- renderUI({
       selectInput("observer", label = "Calibrator name", choices = select_data$recorder)
     })
@@ -351,13 +382,13 @@ table.on("click", "tr", function() {
   output$add_sensor_note <- renderText({
     messages$add_sensor_note
   })
-  messages$pH_mV_note <- "pH mV standards:   pH7 = +- 50;   pH4 = pH 7 value + 165 to 180;   pH 10 = pH 7 value - 165 to 180"
-  output$pH_mV_note <- renderText({
-    messages$pH_mV_note
+  messages$pH_mV_note <- "<b><br><br>pH mV standards:&nbsp;&nbsp;&nbsp;pH7 = +- 50;&nbsp;&nbsp;&nbsp;pH4 = pH 7 value + 165 to 180;&nbsp;&nbsp;&nbsp;pH 10 = pH 7 value - 165 to 180</b>"
+  output$pH_mV_note <- renderUI({
+    HTML(messages$pH_mV_note)
   })
-  messages$ORP_molarity_note <- "If using combination pH/ORP electrode adjust pH first.   Use proper standard scale: YSI Pro Series use 3.5M KCl scale, YSI sondes use 4M KCl scale."
-  output$ORP_molarity_note <- renderText({
-    messages$ORP_molarity_note
+  messages$ORP_molarity_note <- "<b><br><br>If using combination pH/ORP electrode adjust pH first.<br><br>Use proper standard scale: YSI Pro Series use 3.5M KCl scale, YSI sondes use 4M KCl scale.</b>"
+  output$ORP_molarity_note <- renderUI({
+    HTML(messages$ORP_molarity_note)
   })
 
   #Create reset functions for each calibration type ################################################
@@ -443,15 +474,6 @@ table.on("click", "tr", function() {
     updateRadioButtons(session, inputId = "depth_changes_ok", selected = "FALSE")
     shinyjs::hide("delete_depth")
   }
-
-  output$calibration_instruments_table <- DT::renderDataTable({
-    DT::datatable(
-      initial_manage_instruments_table,
-      rownames = FALSE,
-      selection = "multiple",
-      callback = htmlwidgets::JS(table_reset)
-    )
-  }, server = TRUE)
 
 
   ### observeEvents to translate rows clicked into updated inputs, applies to several tables. ############################
@@ -850,7 +872,7 @@ table.on("click", "tr", function() {
         sensors_data$instrument_id <-  instruments_data$maintainable[instruments_data$maintainable$serial_no == input$maintain_serial, "instrument_id"]
 
         #Load the sensors table
-        sensors_data$sensor <- DBI::dbGetQuery(pool, paste0("SELECT * FROM sensor_maintenance WHERE instrument_id = ", sensors_data$instrument_id))
+        sensors_data$sensor <- DBI::dbGetQuery(pool, paste0("SELECT * FROM array_maintenance_changes WHERE instrument_id = ", sensors_data$instrument_id))
         if (nrow(sensors_data$sensor) == 0) {
           sensors_data$sensor <- data.frame("instrument_id" = NA,
                                             "obs_datetime" = NA)
@@ -1583,7 +1605,6 @@ table.on("click", "tr", function() {
       # Search for entries in parameter-specific sheets with the same calibration_id and update the fields
       all_sheets <- DBI::dbListTables(pool)
       calibration_sheets <- all_sheets[grepl("^calibrate_", all_sheets)]
-
       for (i in calibration_sheets) {
         sheet <- DBI::dbGetQuery(pool, paste0("SELECT * FROM ", i, " WHERE calibration_id = ", incomplete_ID))
         if (nrow(sheet) == 1) {
@@ -1594,7 +1615,7 @@ table.on("click", "tr", function() {
             updateNumericInput(session, "temp_reference", value = sheet$temp_reference)
             updateNumericInput(session, "temp_observed", value = sheet$temp_reference)
             shinyjs::show("delete_temp")
-          } else if (i == "calibrate_specific_conductivity") {
+          } else if (i == "calibrate_specific_conductance") {
             output_name <- "Conductivity calibration"
             complete$SpC <- TRUE
             updateNumericInput(session, "SpC1_std", value = sheet$SpC1_std)
@@ -1907,7 +1928,7 @@ table.on("click", "tr", function() {
       } else {
         shinyjs::js$backgroundCol("pH2_mV", "white")
       }
-      if ((pH3_mV > (165 - pH2_mV)) | (pH3_mV < (180 - pH2_mV))& (std3 > 9.9 & std3 < 10.1)) {
+      if ((pH3_mV > (pH2_mV - 165)) | (pH3_mV < (pH2_mV - 180)) & (std3 > 9.9 & std3 < 10.1)) {
         shinyjs::js$backgroundCol("pH3_mV", "red")
         warn_mv_post <- TRUE
       } else if (std3 != 10) {
@@ -1926,6 +1947,9 @@ table.on("click", "tr", function() {
         shinyalert::shinyalert(title = "Some of your post calibration mV values are outside of the valid range!", text = "Re-check your measurements, and if the problem persists consider replacing the electrode (step 1) or entire sensor (last resort). ", type = "warning")
       }
       validation_check$pH <- TRUE
+      if (!warn_ph_std & !warn_ph_post & !warn_mv_post) {
+        shinyalert::shinyalert(title = "Good to go!", type = "success", timer = 2000)
+      }
     }, error = function(e) {
       shinyalert::shinyalert(title = "You have unfilled mandatory entries", text = "If doing a 2-point calibration enter 0 for the third solution values to pass this check.", type = "error")
     })
@@ -1988,8 +2012,8 @@ table.on("click", "tr", function() {
       tryCatch({
         SpC1_ref <- input$SpC1_std
         SpC2_ref <- input$SpC2_std
-        SpC1_post <- if (input$spc_or_not) input$SpC1_post/(1+0.02*(calibration_data$temp$temp_reference - 25)) else input$SpC1_post
-        SpC2_post <- if (input$spc_or_not) input$SpC2_post/(1+0.02*(calibration_data$temp$temp_reference - 25)) else input$SpC2_post
+        SpC1_post <- if (input$spc_or_not) input$SpC1_post/(1 + 0.02*(calibration_data$temp$temp_reference - 25)) else input$SpC1_post
+        SpC2_post <- if (input$spc_or_not) input$SpC2_post/(1 + 0.02*(calibration_data$temp$temp_reference - 25)) else input$SpC2_post
         SpC1_diff <- abs(SpC1_ref - SpC1_post)
         SpC2_diff <- abs(SpC2_ref - SpC2_post)
         gtg1 <- FALSE
@@ -2121,10 +2145,10 @@ table.on("click", "tr", function() {
     tryCatch({
       depth_check <- input$depth_check_ok
       depth_change <- input$depth_changes_ok
-      if (depth_check & depth_change) {
+      if (depth_check == "TRUE" & depth_change == "TRUE") {
         shinyalert::shinyalert(title = "Good to go!", type = "success", timer = 2000)
       } else {
-        shinyalert::shinyalert(title = "You indicated FALSE for one of the values. Are you sure about that? Should you be using a different sensor?", type = "warning")
+        shinyalert::shinyalert(title = "You indicated FALSE or Not Checked for one of the values. Are you sure about that? Should you be using a different sensor?", type = "warning")
       }
       validation_check$depth <- TRUE
     }, error = function(e) {
@@ -2229,36 +2253,36 @@ table.on("click", "tr", function() {
     if (validation_check$pH) {
 
       calibration_data$pH <- data.frame(calibration_id = calibration_data$next_id,
-                                        pH1_std = input$pH1_std,
-                                        pH2_std = input$pH2_std,
-                                        pH3_std = input$pH3_std,
-                                        pH1_pre_val = input$pH1_pre_val,
-                                        pH2_pre_val = input$pH2_pre_val,
-                                        pH3_pre_val = input$pH3_pre_val,
-                                        pH1_mV = input$pH1_mV,
-                                        pH2_mV = input$pH2_mV,
-                                        pH3_mV = input$pH3_mV,
-                                        pH1_post_val = input$pH1_post_val,
-                                        pH2_post_val = input$pH2_post_val,
-                                        pH3_post_val = input$pH3_post_val)
+                                        ph1_std = input$pH1_std,
+                                        ph2_std = input$pH2_std,
+                                        ph3_std = input$pH3_std,
+                                        ph1_pre_val = input$pH1_pre_val,
+                                        ph2_pre_val = input$pH2_pre_val,
+                                        ph3_pre_val = input$pH3_pre_val,
+                                        ph1_mv = input$pH1_mV,
+                                        ph2_mv = input$pH2_mV,
+                                        ph3_mv = input$pH3_mV,
+                                        ph1_post_val = input$pH1_post_val,
+                                        ph2_post_val = input$pH2_post_val,
+                                        ph3_post_val = input$pH3_post_val)
       if (!complete$pH) {
         DBI::dbAppendTable(pool, "calibrate_ph", calibration_data$pH)
 
         complete$pH <- TRUE
         shinyjs::show("delete_pH")
       } else {
-        DBI::dbExecute(pool, paste0("UPDATE calibrate_ph SET pH1_std = ", input$pH1_std,
-                                    ", pH2_std = ", input$pH2_std,
-                                    ", pH3_std = ", input$pH3_std,
-                                    ", pH1_pre_val = ", input$pH1_pre_val,
-                                    ", pH2_pre_val = ", input$pH2_pre_val,
-                                    ", pH3_pre_val = ", input$pH3_pre_val,
-                                    ", pH1_mV = ", input$pH1_mV,
-                                    ", pH2_mV = ", input$pH2_mV,
-                                    ", pH3_mV = ", input$pH3_mV,
-                                    ", pH1_post_val = ", input$pH1_post_val,
-                                    ", pH2_post_val = ", input$pH2_post_val,
-                                    ", pH3_post_val = ", input$pH3_post_val,
+        DBI::dbExecute(pool, paste0("UPDATE calibrate_ph SET ph1_std = ", input$pH1_std,
+                                    ", ph2_std = ", input$pH2_std,
+                                    ", ph3_std = ", input$pH3_std,
+                                    ", ph1_pre_val = ", input$pH1_pre_val,
+                                    ", ph2_pre_val = ", input$pH2_pre_val,
+                                    ", ph3_pre_val = ", input$pH3_pre_val,
+                                    ", ph1_mv = ", input$pH1_mV,
+                                    ", ph2_mv = ", input$pH2_mV,
+                                    ", ph3_mv = ", input$pH3_mV,
+                                    ", ph1_post_val = ", input$pH1_post_val,
+                                    ", ph2_post_val = ", input$pH2_post_val,
+                                    ", ph3_post_val = ", input$pH3_post_val,
                                     " WHERE calibration_id = ", calibration_data$next_id))
       }
       if ("pH calibration" %in% send_table$saved[ ,1] | "pH calibration" %in% send_table$restarted_cal[ ,1]) {
@@ -2373,16 +2397,16 @@ table.on("click", "tr", function() {
 
       calibration_data$orp <- data.frame(calibration_id = calibration_data$next_id,
                                          orp_std = input$orp_std,
-                                         orp_pre_mV = input$orp_pre_mV,
-                                         orp_post_mV = input$orp_post_mV)
+                                         orp_pre_mv = input$orp_pre_mV,
+                                         orp_post_mv = input$orp_post_mV)
       if (!complete$orp) {
         DBI::dbAppendTable(pool, "calibrate_orp", calibration_data$orp)
         complete$orp <- TRUE
         shinyjs::show("delete_orp")
       } else {
         DBI::dbExecute(pool, paste0("UPDATE calibrate_orp SET orp_std = ", input$orp_std,
-                                    " orp_pre_mV = ", input$orp_pre_mV,
-                                    " orp_post_mV = ", input$orp_post_mV,
+                                    " orp_pre_mv = ", input$orp_pre_mV,
+                                    " orp_post_mv = ", input$orp_post_mV,
                                     " WHERE calibration_id = ", calibration_data$next_id))
       }
       if ("ORP calibration" %in% send_table$saved[ ,1] | "ORP calibration" %in% send_table$restarted_cal[ ,1]) {
@@ -2572,8 +2596,8 @@ table.on("click", "tr", function() {
       calibration_data$DO <- data.frame(calibration_id = calibration_data$next_id,
                                         baro_press_pre = input$baro_press_pre,
                                         baro_press_post = input$baro_press_post,
-                                        DO_pre_mgl = input$DO_pre,
-                                        DO_post_mgl = input$DO_post)
+                                        do_pre_mgl = input$DO_pre,
+                                        do_post_mgl = input$DO_post)
       if (!complete$DO) {
         DBI::dbAppendTable(pool, "calibrate_dissolved_oxygen", calibration_data$DO)
 
@@ -2582,8 +2606,8 @@ table.on("click", "tr", function() {
       } else {
         DBI::dbExecute(pool, paste0("UPDATE calibrate_dissolved_oxygen SET baro_press_pre = ", input$baro_press_pre,
                                     ", baro_press_post = ", input$baro_press_post,
-                                    ", DO_pre_mgl = ", input$DO_pre,
-                                    ", DO_post_mgl = ", input$DO_post,
+                                    ", do_pre_mgl = ", input$DO_pre,
+                                    ", do_post_mgl = ", input$DO_post,
                                     " WHERE calibration_id = ", calibration_data$next_id))
       }
       if ("DO calibration" %in% send_table$saved[ ,1] | "DO calibration" %in% send_table$restarted_cal[ ,1]) {
@@ -2634,13 +2658,18 @@ table.on("click", "tr", function() {
 
       calibration_data$depth <- data.frame(calibration_id = calibration_data$next_id,
                                            depth_check_ok = input$depth_check_ok,
-                                           depth_changes_ok = input$depth_changes_ok)
+                                           depth_changes_ok = if (input$depth_changes_ok != "Not Checked") input$depth_changes_ok else NA)
       if (!complete$depth) {
         DBI::dbAppendTable(pool, "calibrate_depth", calibration_data$depth)
         complete$depth <- TRUE
         shinyjs::show("delete_depth")
       } else {
-        DBI::dbExecute(pool, paste0("UPDATE calibrate_depth SET depth_check_ok = '", input$depth_check_ok, "', depth_changes_ok ='", input$depth_changes_ok, "' WHERE calibration_id = ", calibration_data$next_id))
+        if (input$depth_changes_ok != "Not Checked") {
+          DBI::dbExecute(pool, paste0("UPDATE calibrate_depth SET depth_check_ok = '", input$depth_check_ok, "', depth_changes_ok ='", input$depth_changes_ok, "' WHERE calibration_id = ", calibration_data$next_id))
+        } else {
+          DBI::dbExecute(pool, paste0("UPDATE calibrate_depth SET depth_check_ok = '", input$depth_check_ok, "', depth_changes_ok = NULL WHERE calibration_id = ", calibration_data$next_id))
+        }
+
       }
       if ("Depth calibration" %in% send_table$saved[ ,1] | "Depth calibration" %in% send_table$restarted_cal[ ,1]) {
         shinyalert::shinyalert(title = "Depth calibration overwritten", type = "success", timer = 2000, immediate = TRUE)
