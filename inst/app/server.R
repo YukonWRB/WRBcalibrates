@@ -143,6 +143,18 @@ table.on("click", "tr", function() {
   instruments_data$others <- instruments_sheet[instruments_sheet$type != "Handheld" & is.na(instruments_sheet$date_retired) , ]
   instruments_data$maintainable <- instruments_sheet[instruments_sheet$type %in% c("Sonde", "Bulkhead") , ]
 
+  # Create initial tables for managing instruments
+  initial_manage_instruments_table <- instruments_sheet[is.na(instruments_sheet$date_retired), !colnames(instruments_sheet) %in% c("instrument_id", "observer", "obs_datetime", "holds_replaceable_sensors", "retired_by", "date_retired")]
+  output$manage_instruments_table <- DT::renderDataTable(initial_manage_instruments_table, rownames = FALSE, selection = "single")
+  output$calibration_instruments_table <- DT::renderDataTable({
+    DT::datatable(
+      initial_manage_instruments_table,
+      rownames = FALSE,
+      selection = "multiple",
+      callback = htmlwidgets::JS(table_reset)
+    )
+  }, server = TRUE)
+
   observe({
     instruments_data$observers$observer_string <- paste0(instruments_data$observers$observer_first, " ", instruments_data$observers$observer_last, " (", instruments_data$observers$organization, ")")
     select_data$recorder <- setNames(c(instruments_data$observers$observer_id, "new"), c(instruments_data$observers$observer_string, "Add new observer"))
@@ -169,10 +181,7 @@ table.on("click", "tr", function() {
     })
 
     if (!restarted$initialized) {
-      # Create initial table for managing instruments and incomplete calibrations
-      initial_manage_instruments_table <- instruments_sheet[is.na(instruments_sheet$date_retired), !colnames(instruments_sheet) %in% c("instrument_id", "observer", "obs_datetime", "holds_replaceable_sensors", "retired_by", "date_retired")]
-      output$manage_instruments_table <- DT::renderDataTable(initial_manage_instruments_table, rownames = FALSE, selection = "single")
-
+      # Create initial tables for managing incomplete calibrations
       incomplete_calibrations <- calibrations[calibrations$complete == FALSE, ] # find out if any calibrations are labelled as incomplete
       if (nrow(incomplete_calibrations) > 0) {
         shinyalert::shinyalert(title = "Incomplete calibrations found!", text = "Go to to the page 'View unfinished calibrations' to restart or delete them.")
@@ -188,16 +197,6 @@ table.on("click", "tr", function() {
                                           "Date/Time UTC" = "No unsaved calibrations!",
                                           check.names = FALSE)
       }
-
-      output$calibration_instruments_table <- DT::renderDataTable({
-        DT::datatable(
-          initial_manage_instruments_table,
-          rownames = FALSE,
-          selection = "multiple",
-          callback = htmlwidgets::JS(table_reset)
-        )
-      }, server = TRUE)
-
       restarted$initialized <- TRUE
     }
 
