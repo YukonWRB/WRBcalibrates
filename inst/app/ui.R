@@ -57,7 +57,7 @@ app_ui <- function(request) {
 
       # Tabs
       navbarPage(
-        title = "Navigation",
+        title = "",
         theme = shinythemes::shinytheme("flatly"),
         collapsible = TRUE,
         id = "first_selection",

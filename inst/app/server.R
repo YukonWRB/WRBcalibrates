@@ -132,7 +132,8 @@ table.on("click", "tr", function() {
   # Get the data from the database, make initial tables, populate UI elements ########################################
   instruments_sheet <- DBI::dbGetQuery(pool, "SELECT i.instrument_id, i.obs_datetime, CONCAT(observers.observer_first, ' ', observers.observer_last) AS observer, i.holds_replaceable_sensors, i.serial_no, i.asset_tag, i.date_in_service, i.date_purchased, i.retired_by, i.date_retired, instrument_make.make, instrument_model.model, instrument_type.type FROM instruments AS i LEFT JOIN instrument_make ON i.make = instrument_make.make_id LEFT JOIN instrument_model ON i.model = instrument_model.model_id LEFT JOIN instrument_type ON i.type = instrument_type.type_id LEFT JOIN observers ON i.observer = observers.observer_id ORDER BY i.instrument_id")
 
-  calibrations <- DBI::dbGetQuery(pool, "SELECT * FROM calibrations")  # This will be used to check if there are any incomplete calibrations
+  calibrations <- reactiveValues()
+  calibrations$calibrations <- DBI::dbGetQuery(pool, "SELECT * FROM calibrations")  # This will be used to check if there are any incomplete calibrations
 
   instruments_data$sheet <- instruments_sheet
   instruments_data$observers <- DBI::dbGetQuery(pool, "SELECT * FROM observers")
@@ -182,7 +183,8 @@ table.on("click", "tr", function() {
 
     if (!restarted$initialized) {
       # Create initial tables for managing incomplete calibrations
-      incomplete_calibrations <- calibrations[calibrations$complete == FALSE, ] # find out if any calibrations are labelled as incomplete
+      incomplete_calibrations <- calibrations$calibrations[calibrations$calibrations$complete == FALSE, ] # find out if any calibrations are labelled as incomplete
+      calibrations$incomplete_calibrations <- incomplete_calibrations
       if (nrow(incomplete_calibrations) > 0) {
         shinyalert::shinyalert(title = "Incomplete calibrations found!", text = "Go to to the page 'View unfinished calibrations' to restart or delete them.")
         incomplete_calibrations <- dplyr::left_join(incomplete_calibrations, instruments_data$observers[, c("observer_id", "observer_string")], by = dplyr::join_by(observer == observer_id))
@@ -767,7 +769,7 @@ table.on("click", "tr", function() {
       shinyjs::hide("add_comment")
       shinyjs::hide("add.change_sensor.comment_name")
       shinyjs::hide("add.change_sensor.comment")
-      updateNumericInput(session, "restart_index", min = 0, max = nrow(incomplete_calibrations))
+      updateNumericInput(session, "restart_index", min = 0, max = nrow(calibrations$incomplete_calibrations))
     }
   })
 
@@ -1597,7 +1599,7 @@ table.on("click", "tr", function() {
       shinyjs::show("restart_table")
       send_table$restarted_cal <- data.frame("Saved calibrations (recovered session)" = "Basic info", check.names = FALSE) #Set/reset here for if the user selects a different calibration in the same session
       complete$basic <- TRUE
-      incomplete_ID <- as.numeric(incomplete_calibrations[restart_value , 1])
+      incomplete_ID <- as.numeric(calibrations$incomplete_calibrations[restart_value , "calibration_id"])
       calibration_data$next_id <- incomplete_ID
       calibration_data$restarted_id <- incomplete_ID
 
@@ -1677,15 +1679,15 @@ table.on("click", "tr", function() {
       }
       # Reset the basic fields according to recovered info
       output$observer <- renderUI({
-        selectInput("observer", label = "Calibrator name", choices = select_data$recorder, selected = select_data$recorder[incomplete_calibrations[restart_value, "observer"]])
+        selectInput("observer", label = "Calibrator name", choices = select_data$recorder, selected = select_data$recorder[calibrations$incomplete_calibrations[restart_value, "observer"]])
       })
-      shinyWidgets::updateAirDateInput(session, "obs_datetime", value = incomplete_calibrations[restart_value, "obs_datetime"])
+      shinyWidgets::updateAirDateInput(session, "obs_datetime", value = calibrations$incomplete_calibrations[restart_value, "obs_datetime"])
       output$ID_sensor_holder <- renderUI({
         div(
           selectizeInput("ID_sensor_holder", label = "Logger/bulkhead/sonde serial #", choices = c("", instruments_data$others$serial_no),
                          selected =
-                           if (!is.na(incomplete_calibrations[incomplete_calibrations$calibration_id == incomplete_ID , "id_sensor_holder"]))
-                             instruments_data$others[instruments_data$others$instrument_id == incomplete_calibrations[incomplete_calibrations$calibration_id == incomplete_ID, "id_sensor_holder"], "serial_no"]
+                           if (!is.na(calibrations$incomplete_calibrations[calibrations$incomplete_calibrations$calibration_id == incomplete_ID , "id_sensor_holder"]))
+                             instruments_data$others[instruments_data$others$instrument_id == calibrations$incomplete_calibrations[calibrations$incomplete_calibrations$calibration_id == incomplete_ID, "id_sensor_holder"], "serial_no"]
                          else "NA"),
           style = "color: white; background-color: blue;"
         )
@@ -1694,8 +1696,8 @@ table.on("click", "tr", function() {
         div(
           selectizeInput("ID_handheld_meter", label = "Handheld serial # (if applicable)", choices = c("NA", instruments_data$handhelds$serial_no),
                          selected =
-                           if (!is.na(incomplete_calibrations[incomplete_calibrations$calibration_id == incomplete_ID , "id_handheld_meter"]))
-                             instruments_data$others[instruments_data$others$instrument_id == incomplete_calibrations[incomplete_calibrations$calibration_id == incomplete_ID, "id_handheld_meter"], "serial_no"]
+                           if (!is.na(calibrations$incomplete_calibrations[calibrations$incomplete_calibrations$calibration_id == incomplete_ID , "id_handheld_meter"]))
+                             instruments_data$others[instruments_data$others$instrument_id == calibrations$incomplete_calibrations[calibrations$incomplete_calibrations$calibration_id == incomplete_ID, "id_handheld_meter"], "serial_no"]
                          else "NA"),
           style = "color: white; background-color: green;"
         )
@@ -1720,7 +1722,7 @@ table.on("click", "tr", function() {
     } else if (!(delete_value %in% complete$incomplete$Index)) {
       shinyalert::shinyalert("The number you entered does not correspond to a row/index number", type = "error")
     } else {
-      delete_ID <- as.numeric(incomplete_calibrations[delete_value , 1])
+      delete_ID <- as.numeric(calibrations$incomplete_calibrations[delete_value , "calibration_id"])
       shinyalert::shinyalert("Deleting old calibration", type = "info")
       all_sheets <- DBI::dbListTables(pool)
       calibration_sheets <- all_sheets[grepl("^calibrate_", all_sheets)]
@@ -1735,6 +1737,7 @@ table.on("click", "tr", function() {
                                           check.names = FALSE)
       }
       output$incomplete_table <- DT::renderDataTable(complete$incomplete, rownames = FALSE, selection = "single")
+      calibrations$incomplete_calibrations <- calibrations$incomplete_calibrations[!calibrations$incomplete_calibrations$calibration_id == delete_ID ,]
       #reset internal markers of completeness
       complete$basic <- FALSE
       complete$temperature <- FALSE
@@ -2724,9 +2727,9 @@ table.on("click", "tr", function() {
                              callbackR = function(x) {
                                if (x) {# Mark it as complete == TRUE. Read in calibrations again as the sheet now has a new row or a row that is being edited from incomplete calibration.
                                  DBI::dbExecute(pool, paste0("UPDATE calibrations SET complete = 'TRUE' WHERE calibration_id = ", calibration_data$next_id))
-                                 calibrations <- DBI::dbReadTable(pool, "calibrations")
+                                 calibrations$calibrations <- DBI::dbReadTable(pool, "calibrations")
 
-                                 calibrations[calibrations$calibration_id == calibration_data$next_id, "complete"] <- TRUE  #mark as complete in the local df as well
+                                 calibrations$calibrations[calibrations$calibrations$calibration_id == calibration_data$next_id, "complete"] <- TRUE  #mark as complete in the local df as well
                                  shinyalert::shinyalert(title = paste0("Calibration finalized."),
                                                         type = "success", immediate = TRUE)
                                  #Reset fields
