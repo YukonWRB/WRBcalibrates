@@ -201,10 +201,11 @@ app_ui <- function(request) {
                   actionButton("sensor7_show", "Slot 7"),
                   actionButton("sensor8_show", "Slot 8")
               ),
-              selectizeInput("add_sensor_dropdown", "Add a slot w/ sensor", choices = c("", "pH", "pH/ORP", "ORP", "Conductivity/Temperature", "Conductivity", "Turbidity", "Temperature", "DO", "Depth", "Nitrate", "Ammonium", "Chloride" , "DOM", "Rhodamine", "Total algae", "Central Wiper")),
-              textInput("new_sensor_serial", "Serial number", ""),
-              textOutput("add_sensor_note"),
+              selectizeInput("add_sensor_type_dropdown", "ADD a slot w/ sensor (CHANGE assigned sensor to the right)", choices = "placeholder"),
+              selectizeInput("new_sensor_serial", "Serial number (type your own if not in yet)", choices = NULL, options = list(create = TRUE)),
+              actionButton("add_new_sensor_serial", "Add new sensor to database"),
               uiOutput("add_sensor_name"),
+              textOutput("add_sensor_note"),
               actionButton("add_sensor", "Submit")
             ),
             mainPanel(
@@ -217,11 +218,11 @@ app_ui <- function(request) {
               DT::dataTableOutput("sensor6_details"),
               DT::dataTableOutput("sensor7_details"),
               DT::dataTableOutput("sensor8_details"),
-              selectInput("change_sensor", "Assign a new sensor", choices = c("", "pH", "pH/ORP", "ORP", "Conductivity/Temperature", "Conductivity", "Turbidity", "Temperature", "DO", "Depth", "Nitrate", "Ammonium", "Chloride" , "DOM", "Rhodamine", "Total algae", "Central Wiper")),
+              selectInput("change_sensor", "Assign a new sensor", choices = "placeholder"),
               textInput("add_sensor_serial", "Serial number", ""),
               textAreaInput("add_comment", "Add a note", "", height = "100px"),
-              uiOutput("add.change_sensor.comment_name"),
-              actionButton("add.change_sensor.comment", "Submit new record")
+              uiOutput("sensor_change_name"),
+              actionButton("submit_sensor_change", "Submit new record")
             )
           )
         ),

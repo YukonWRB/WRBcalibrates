@@ -146,7 +146,13 @@ DBI::dbExecute(con, "CREATE TABLE observers (
     FOR EACH ROW EXECUTE FUNCTION check_location_exists();
   ")
 
-  # Create "sensors" table ########################################
+  # Create "sensors" tables ########################################
+  DBI::dbExecute(con,
+                 "CREATE TABLE sensor_types (
+                  sensor_type_id SERIAL PRIMARY KEY,
+                  sensor_type TEXT NOT NULL,
+                  sensor_type_description TEXT
+                 )")
   DBI::dbExecute(con,
                  "CREATE TABLE sensors (
                   sensor_id SERIAL PRIMARY KEY,
@@ -160,7 +166,8 @@ DBI::dbExecute(con, "CREATE TABLE observers (
                   sensor_date_retired DATE,
                   sensor_asset_tag TEXT,
                   sensor_notes TEXT,
-                  UNIQUE (sensor_serial)
+                  UNIQUE (sensor_serial),
+                  FOREIGN KEY (sensor_type) REFERENCES sensor_types(sensor_type_id) ON UPDATE CASCADE ON DELETE CASCADE
                  )
                  ;")
 
@@ -179,6 +186,7 @@ DBI::dbExecute(con, "CREATE TABLE observers (
 
 DBI::dbExecute(con,
                "CREATE TABLE array_maintenance_changes (
+                event_id SERIAL PRIMARY KEY,
                 instrument_id INTEGER NOT NULL,
                 observer INTEGER NOT NULL,
                 obs_datetime TIMESTAMP WITH TIME ZONE NOT NULL,
