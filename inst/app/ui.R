@@ -12,17 +12,6 @@ app_ui <- function(request) {
       el.css("background-color", params.col);
     }'
 
-#   restoreCalibrator <- "
-# Shiny.addCustomMessageHandler('setCalibratorName', function(name) {
-#   localStorage.setItem('calibratorName', name);
-# });
-#
-# Shiny.addCustomMessageHandler('getCalibratorName', function(message) {
-#   var name = localStorage.getItem('calibratorName');
-#   Shiny.onInputChange('storedCalibratorName', name);
-# });
-# "
-
   tagList(
     fluidPage(
       shinyjs::useShinyjs(),
@@ -45,10 +34,10 @@ app_ui <- function(request) {
               display: block !important;
             }"
           )
-        )
+        ),
+        tags$script(src = "https://cdnjs.cloudflare.com/ajax/libs/js-cookie/2.2.1/js.cookie.min.js")  # Cookies library
       ),
       shinyjs::extendShinyjs(text = instrSelectBGCol, functions = c("backgroundCol")),
-      # shinyjs::extendShinyjs(text = restoreCalibrator, functions = c("setCalibratorName", "getCalibratorName")),
 
       # Title
       titlePanel("Instrument Calibration and Tracking"),
@@ -215,7 +204,7 @@ app_ui <- function(request) {
               selectizeInput("add_sensor_dropdown", "Add a slot w/ sensor", choices = c("", "pH", "pH/ORP", "ORP", "Conductivity/Temperature", "Conductivity", "Turbidity", "Temperature", "DO", "Depth", "Nitrate", "Ammonium", "Chloride" , "DOM", "Rhodamine", "Total algae", "Central Wiper")),
               textInput("new_sensor_serial", "Serial number", ""),
               textOutput("add_sensor_note"),
-              selectInput("add_sensor_name", "What's your name?", choices = "placeholder"),
+              uiOutput("add_sensor_name"),
               actionButton("add_sensor", "Submit")
             ),
             mainPanel(
