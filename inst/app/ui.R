@@ -54,7 +54,7 @@ app_ui <- function(request) {
           "Calibrate",
           sidebarLayout(
             sidebarPanel(
-              selectInput("selection", label = "Select a parameter", choices = c("Basic calibration info", "Temperature calibration", "Conductivity calibration", "pH calibration", "ORP calibration", "Turbidity calibration", "DO calibration", "Depth calibration")),
+              selectizeInput("selection", label = "Select a parameter", choices = c("Basic calibration info", "Temperature calibration", "Conductivity calibration", "pH calibration", "ORP calibration", "Turbidity calibration", "DO calibration", "Depth calibration")),
               conditionalPanel(
                 condition = "input.selection == 'Basic calibration info'",
                 uiOutput("observer"),
@@ -165,12 +165,12 @@ app_ui <- function(request) {
           "Manage instruments",
           sidebarLayout(
             sidebarPanel(
-              selectInput("existing_serial_no", "Search existing serial numbers", choices = "New record"),
+              selectizeInput("existing_serial_no", "Search existing serial numbers", choices = "New record"),
               textInput("serial_no", "New serial no (add alias by appending to serial #, e.g. 012345Blue)", value = "Search first!"),
-              selectInput("recorder", label = "Observer name", choices = "placeholder"),
-              selectInput("make", label = "Instrument make", choices = "placeholder"),
-              selectInput("model", label = "Instrument model", choices = "placeholder"),
-              selectInput("type", label = "Instrument type", choices = "placeholder"),
+              selectizeInput("recorder", label = "Observer name", choices = "placeholder"),
+              selectizeInput("make", label = "Instrument make", choices = "placeholder"),
+              selectizeInput("model", label = "Instrument model", choices = "placeholder"),
+              selectizeInput("type", label = "Instrument type", choices = "placeholder"),
               checkboxInput("replaceableSensors", "Replaceable sensors?", value = FALSE),
               textInput("asset_tag", "Asset tag number", value = ""),
               dateInput("date_in_service", label = "Date in service"),
@@ -189,7 +189,7 @@ app_ui <- function(request) {
           sidebarLayout(
             sidebarPanel(
               textOutput("sensors_reminder"),
-              selectInput("maintain_serial", "Select your instrument", choices = "loading choices..."),
+              selectizeInput("maintain_serial", "Select your instrument", choices = "loading choices..."),
               div(class = "load_sensors_btn", actionButton("load_sensors", "Show sensors")),
               div(class = "show_sensors_btns",
                   actionButton("sensor1_show", "Slot 1"),
@@ -218,8 +218,9 @@ app_ui <- function(request) {
               DT::dataTableOutput("sensor6_details"),
               DT::dataTableOutput("sensor7_details"),
               DT::dataTableOutput("sensor8_details"),
-              selectInput("change_sensor", "Assign a new sensor", choices = "placeholder"),
-              textInput("add_sensor_serial", "Serial number", ""),
+              selectizeInput("change_sensor", "Assign a new sensor", choices = "placeholder"),
+              selectizeInput("add_sensor_serial", "Serial number (type your own if not in yet)", choices = NULL, options = list(create = TRUE)),
+              actionButton("add_new_sensor_serial2", "Add new sensor to database"),
               textAreaInput("add_comment", "Add a note", "", height = "100px"),
               uiOutput("sensor_change_name"),
               actionButton("submit_sensor_change", "Submit new record")
