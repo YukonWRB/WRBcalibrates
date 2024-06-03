@@ -35,17 +35,6 @@ table.on("click", "tr", function() {
 });
 '
 
-  # Logic to save and fetch field entries from the user's browser ################################################
-  # observeEvent(input$observer, {
-  #   js$setCalibratorName(input$observer)
-  # })
-  #
-  # observe({
-  #   session$sendCustomMessage(type = 'getCalibratorName', message = '')
-  # })
-
-
-
   # Initial show/hide and creation of containers ################################################
   # create a few containers
   validation_check <- reactiveValues()
@@ -130,7 +119,7 @@ table.on("click", "tr", function() {
   shinyjs::hide("SpC2_post")
 
   # Get the data from the database, make initial tables, populate UI elements ########################################
-  instruments_sheet <- DBI::dbGetQuery(pool, "SELECT i.instrument_id, i.obs_datetime, CONCAT(observers.observer_first, ' ', observers.observer_last) AS observer, i.holds_replaceable_sensors, i.serial_no, i.asset_tag, i.date_in_service, i.date_purchased, i.retired_by, i.date_retired, instrument_make.make, instrument_model.model, instrument_type.type FROM instruments AS i LEFT JOIN instrument_make ON i.make = instrument_make.make_id LEFT JOIN instrument_model ON i.model = instrument_model.model_id LEFT JOIN instrument_type ON i.type = instrument_type.type_id LEFT JOIN observers ON i.observer = observers.observer_id ORDER BY i.instrument_id")
+  instruments_sheet <- DBI::dbGetQuery(pool, "SELECT i.instrument_id, i.obs_datetime,  CONCAT(observers.observer_first, ' ', observers.observer_last, '(', observers.organization, ')') AS observer, i.holds_replaceable_sensors, i.serial_no, i.asset_tag, i.date_in_service, i.date_purchased, i.retired_by, i.date_retired, instrument_make.make, instrument_model.model, instrument_type.type, i.owner FROM instruments AS i LEFT JOIN instrument_make ON i.make = instrument_make.make_id LEFT JOIN instrument_model ON i.model = instrument_model.model_id LEFT JOIN instrument_type ON i.type = instrument_type.type_id LEFT JOIN observers ON i.observer = observers.observer_id ORDER BY i.instrument_id")
 
   calibrations <- reactiveValues()
   calibrations$calibrations <- DBI::dbGetQuery(pool, "SELECT * FROM calibrations")  # This will be used to check if there are any incomplete calibrations
@@ -148,7 +137,7 @@ table.on("click", "tr", function() {
   sensors_data$sensor_types <- DBI::dbGetQuery(pool, paste0("SELECT * FROM sensor_types"))
 
   # Create initial tables for managing instruments
-  initial_manage_instruments_table <- instruments_sheet[is.na(instruments_sheet$date_retired), !colnames(instruments_sheet) %in% c("instrument_id", "observer", "obs_datetime", "holds_replaceable_sensors", "retired_by", "date_retired")]
+  initial_manage_instruments_table <- instruments_sheet[is.na(instruments_sheet$date_retired), !colnames(instruments_sheet) %in% c("instrument_id", "observer", "obs_datetime")]
   output$manage_instruments_table <- DT::renderDataTable(initial_manage_instruments_table, rownames = FALSE, selection = "single")
   output$calibration_instruments_table <- DT::renderDataTable({
     DT::datatable(
@@ -250,6 +239,34 @@ table.on("click", "tr", function() {
       shinyjs::runjs(paste0("Cookies.set('last_observer_id', '", selected_id, "', { expires: 30 });"))
     }
   }, ignoreInit = TRUE, ignoreNULL = TRUE)
+  observeEvent(input$recorder, {
+    if (input$recorder == "new") {
+      # Add a new observer using a modal dialog
+      showModal(modalDialog(title = "Add new observer",
+                            textInput("new_observer_first", "First name"),
+                            textInput("new_observer_last", "Last name"),
+                            textInput("new_observer_org", "Organization"),
+                            actionButton("add_new_observer", "Add new observer")
+      ))
+    } else { # If an existing observer is selected, save the observer ID to a cookie
+      selected_id <- input$recorder
+      shinyjs::runjs(paste0("Cookies.set('last_observer_id', '", selected_id, "', { expires: 30 });"))
+    }
+  }, ignoreInit = TRUE, ignoreNULL = TRUE)
+  observeEvent(input$retired_by, {
+    if (input$retired_by == "new") {
+      # Add a new observer using a modal dialog
+      showModal(modalDialog(title = "Add new observer",
+                            textInput("new_observer_first", "First name"),
+                            textInput("new_observer_last", "Last name"),
+                            textInput("new_observer_org", "Organization"),
+                            actionButton("add_new_observer", "Add new observer")
+      ))
+    } else { # If an existing observer is selected, save the observer ID to a cookie
+      selected_id <- input$retired_by
+      shinyjs::runjs(paste0("Cookies.set('last_observer_id', '", selected_id, "', { expires: 30 });"))
+    }
+  }, ignoreInit = TRUE, ignoreNULL = TRUE)
   observeEvent(input$sensor_change_name, {
     if (input$sensor_change_name == "new") {
       # Add a new observer using a modal dialog
@@ -296,6 +313,12 @@ table.on("click", "tr", function() {
 
     output$observer <- renderUI({
       selectizeInput("observer", label = "Calibrator name", choices = select_data$recorder, selected = selected_id)
+    })
+    output$recorder <- renderUI({
+      selectizeInput("recorder", label = "Observer name", choices = select_data$recorder, selected = selected_id)
+    })
+    output$retired_by <- renderUI({
+      selectizeInput("retired_by", label = "Retired by", choices = select_data$recorder, selected = selected_id)
     })
     output$add_sensor_name <- renderUI({
       selectizeInput("add_sensor_name", label = "What's your name?", choices = select_data$recorder, selected = selected_id)
@@ -465,7 +488,7 @@ table.on("click", "tr", function() {
   }, ignoreInit = TRUE)
 
   # Render messages and notes, show/hide messages based on selection ################################################
-  messages$instrument_reminder <- "Add your instrument if not listed!"
+  messages$instrument_reminder <- "Add your instrument if not listed via the 'Manage instruments' tab"
   messages$add_sensor_note <- "Caution: ADDS new sensor slot. To CHANGE sensor type, click on the sensor button for new options."
 
   # Initiate data.frame to populate with saved calibrations later
@@ -498,7 +521,7 @@ table.on("click", "tr", function() {
 
   observeEvent(input$selection, {
     if (input$selection == "Basic calibration info") {
-      instruments_data$manage_instruments <- instruments_data$sheet[ , !colnames(instruments_data$sheet) %in% c("instrument_ID", "observer", "obs_datetime", "holds_replaceable_sensors", "retired_by", "date_retired")]
+      instruments_data$manage_instruments <- instruments_data$sheet[ , !colnames(instruments_data$sheet) %in% c("instrument_ID", "observer", "obs_datetime")]
       output$calibration_instruments_table <- DT::renderDT({
         DT::datatable(
           instruments_data$manage_instruments,
@@ -608,8 +631,8 @@ table.on("click", "tr", function() {
   }
 
 
-  ### observeEvents to translate rows clicked into updated inputs, applies to several tables. ############################
-  # the tricky one: the table where sensor holder and handheld are selected. Depends on table_reset js code defined at tope of server.
+  # observeEvents to translate rows clicked into updated inputs, applies to several tables. ############################
+  # the tricky one: the table where sensor holder and handheld are selected. Depends on table_reset js code defined at top of server.
   click_count <- reactiveValues(value = 0)
   observeEvent(input$calibration_instruments_table_rows_selected, {
     output$ID_sensor_holder <- renderUI({
@@ -705,7 +728,6 @@ table.on("click", "tr", function() {
           )
         }, server = TRUE)
       }
-
     }
   })
 
@@ -716,6 +738,7 @@ table.on("click", "tr", function() {
 
   observeEvent(input$manage_instruments_table_rows_selected, {
     updateSelectizeInput(session, "existing_serial_no", selected = instruments_data$manage_instruments[input$manage_instruments_table_rows_selected[1], "serial_no"])
+    # Everything else on the page is updated based on the serial number selected
   })
 
   observeEvent(input$manage_sensors_table_rows_selected, {
@@ -795,21 +818,28 @@ table.on("click", "tr", function() {
       shinyjs::hide("submit_sensor_change")
       shinyjs::hide("date_retired")
       shinyjs::hide("retired_by")
-      updateSelectizeInput(session, "existing_serial_no", choices = c("New record", instruments_data$sheet$serial_no))
-      updateSelectizeInput(session, "recorder", choices = select_data$recorder)
-      updateSelectizeInput(session, "make", choices = select_data$makes)
-      updateSelectizeInput(session, "model", choices = select_data$models)
-      updateSelectizeInput(session, "type", choices = select_data$types)
+      updateSelectizeInput(session, "existing_serial_no", choices = c("New record", instruments_data$sheet$serial_no), selected = "")
+      output$recorder <- renderUI({
+        selectizeInput("recorder", label = "Observer name", choices = select_data$recorder)
+      })
+      output$recorder <- renderUI({
+        selectizeInput("retired_by", label = "Observer name", choices = select_data$recorder)
+      })
+      updateSelectizeInput(session, "make", choices = select_data$makes, selected = "")
+      updateSelectizeInput(session, "model", choices = select_data$models, selected = "")
+      updateSelectizeInput(session, "type", choices = select_data$types, selected = "")
+      updateTextInput(session, "instrument_owner", value = "")
+      updateCheckboxInput(session, "holds_replaceable_sensors", value = FALSE)
       updateDateInput(session, "date_retired", value = NA) #Reset the retired date to NA
       updateDateInput(session, "date_in_service", value = NA)
       updateDateInput(session, "date_purchased", value = NA)
-      instruments_data$manage_instruments <- instruments_data$sheet[ , !colnames(instruments_data$sheet) %in% c("instrument_id", "observer", "obs_datetime", "holds_replaceable_sensors")]
+      instruments_data$manage_instruments <- instruments_data$sheet[ , !colnames(instruments_data$sheet) %in% c("instrument_id", "observer", "obs_datetime")]
       output$manage_instruments_table <- DT::renderDataTable(instruments_data$manage_instruments, rownames = FALSE, selection = "single")
     } else if (input$first_selection == "Manage sensors and log maintenance") {
       #reload instruments_data$sheet to mitigate conflicts
-      instruments_data$sheet <- DBI::dbGetQuery(pool, "SELECT i.instrument_id, i.obs_datetime, CONCAT(observers.observer_first, ' ', observers.observer_last) AS observer, i.holds_replaceable_sensors, i.serial_no, i.asset_tag, i.date_in_service, i.date_purchased, i.retired_by, i.date_retired, instrument_make.make, instrument_model.model, instrument_type.type FROM instruments AS i LEFT JOIN instrument_make ON i.make = instrument_make.make_id LEFT JOIN instrument_model ON i.model = instrument_model.model_id LEFT JOIN instrument_type ON i.type = instrument_type.type_id LEFT JOIN observers ON i.observer = observers.observer_id ORDER BY i.instrument_id")
+      instruments_data$sheet <- DBI::dbGetQuery(pool, "SELECT i.instrument_id, i.obs_datetime, CONCAT(observers.observer_first, ' ', observers.observer_last, '(', observers.organization, ')') AS observer, i.holds_replaceable_sensors, i.serial_no, i.asset_tag, i.date_in_service, i.date_purchased, i.retired_by, i.date_retired, instrument_make.make, instrument_model.model, instrument_type.type, i.owner FROM instruments AS i LEFT JOIN instrument_make ON i.make = instrument_make.make_id LEFT JOIN instrument_model ON i.model = instrument_model.model_id LEFT JOIN instrument_type ON i.type = instrument_type.type_id LEFT JOIN observers ON i.observer = observers.observer_id ORDER BY i.instrument_id")
       instruments_data$maintainable <- instruments_data$sheet[instruments_data$sheet$type %in% c("Sonde", "Bulkhead") , ]
-      temp_table <- instruments_data$maintainable[, c("make", "model", "type", "serial_no")]
+      temp_table <- instruments_data$maintainable[, c("make", "model", "type", "serial_no", "owner")]
       output$manage_sensors_table <- DT::renderDataTable(temp_table, rownames = FALSE, selection = "single")
       updateSelectizeInput(session, "maintain_serial", choices = c("", instruments_data$maintainable$serial_no))
       shinyjs::hide("submit_btn")
@@ -1004,7 +1034,7 @@ table.on("click", "tr", function() {
         #Find the instrument_id associated with this instrument
         sensors_data$instrument_id <- instruments_data$maintainable[instruments_data$maintainable$serial_no == input$maintain_serial, "instrument_id"]
 
-        #Load the array_maintenance_changes table
+        #Load the array_maintenance_changes table subset for that instrument
         sensors_data$instrument <- DBI::dbGetQuery(pool, paste0("SELECT * FROM array_maintenance_changes WHERE instrument_id = ", sensors_data$instrument_id))
 
         shinyjs::show("add_sensor_type_dropdown")
@@ -1206,13 +1236,16 @@ table.on("click", "tr", function() {
 
     sensors_data$datetime_exists <- if (max(sensors_data$instrument$obs_datetime) == sensors_data$datetime) TRUE else FALSE
 
-    sensors_data[[sensor_details_name]] <- data.frame(
+    df <- data.frame(
       "Date/time" = substr(sensors_data$instrument$obs_datetime, 1, 16),
       "Type" = sensor_type,
       "Serial" = sensor_serial,
       "Notes" = sensors_data$instrument[[sensor_notes_col]],
       check.names = FALSE
     )
+    df <- df[!is.na(df$Notes), ]
+
+    sensors_data[[sensor_details_name]] <- df
 
     output[[sensor_details_name]] <- DT::renderDataTable(sensors_data[[sensor_details_name]], rownames = FALSE)
 
@@ -1228,15 +1261,12 @@ table.on("click", "tr", function() {
           selectizeInput("sensor_change_name", label = "Observer name", choices = select_data$recorder, selected = sensors_data$instrument[nrow(sensors_data$instrument), "observer"])
         })
         updateActionButton(session, "submit_sensor_change", label = "Save edits")
-        shinyjs::show("submit_sensor_change")
       }
     } else {
       updateSelectizeInput(session, "add_sensor_serial", choices = serial_choices, selected = "")
       updateTextAreaInput(session, "add_comment", value = "")
       updateActionButton(session, "submit_sensor_change", label = "Submit New Record")
-      shinyjs::show("submit_sensor_change")
     }
-
     # Hide other sensor details and show the current sensor details
     for (i in 1:8) {
       if (i == sensor_index) {
@@ -1247,7 +1277,6 @@ table.on("click", "tr", function() {
         shinyjs::runjs(paste0('document.getElementById("sensor', i, '_show").style.color = "#000000";'))
       }
     }
-
     shinyjs::show("change_sensor")
     shinyjs::show("add_comment")
     shinyjs::show("sensor_change_name")
@@ -1284,8 +1313,8 @@ table.on("click", "tr", function() {
         DBI::dbExecute(pool, paste0("UPDATE array_maintenance_changes SET ", col_id, " = ", sensor_id, ", ", col_comment, " = '", input$add_comment, "', WHERE obs_datetime = '", sensors_data$datetime, "' AND instrument_id = ", sensors_data$instrument_id, ";"))
         run_else <- FALSE
       } else  { #append to array_maintenance_changes with a new row
-        # Take the final row of the array_maintenance_changes table and replace fields
-        df <- sensors_data$instrument[nrow(sensors_data$instrument), ]
+        # Take the final row of the array_maintenance_changes table and replace fields. Remove notes from all other sensors; they don't share a datetime with the current session.
+        df <- sensors_data$instrument[nrow(sensors_data$instrument), c("instrument_id", "sensor1_id", "sensor2_id", "sensor3_id", "sensor4_id", "sensor5_id", "sensor6_id", "sensor7_id", "sensor8_id")]
         df$event_id <- NULL
         df$obs_datetime <- sensors_data$datetime
         df$observer <- input$sensor_change_name
@@ -1315,31 +1344,47 @@ table.on("click", "tr", function() {
   # Make a new instrument record or modify an existing one ##############################################
   observeEvent(input$existing_serial_no, { #populate fields as required
     if (input$existing_serial_no != "New record") {
+
       modify_record <- instruments_data$sheet[instruments_data$sheet$serial_no == input$existing_serial_no ,]
       updateTextInput(session, "serial_no", value = modify_record$serial_no)
-      output$observer <- renderUI({
-        selectizeInput("observer", label = "Calibrator name", choices = select_data$recorder)
+
+      recorder <- select_data$recorder[names(select_data$recorder) == modify_record$observer]
+      output$recorder <- renderUI({
+        selectizeInput("recorder", label = "Observer name", choices = select_data$recorder, selected = recorder)
       })
-      updateSelectizeInput(session, "make", selected = modify_record$make)
-      updateTextInput(session, "model", value = modify_record$model)
-      updateSelectizeInput(session, "type", selected = modify_record$type)
+      make <- instruments_data$makes[instruments_data$makes$make == modify_record$make, "make_id"]
+      updateSelectizeInput(session, "make", selected = make)
+      model <- instruments_data$models[instruments_data$models$model == modify_record$model, "model_id"]
+      updateSelectizeInput(session, "model", selected = model)
+      type <- instruments_data$types[instruments_data$types$type == modify_record$type, "type_id"]
+      updateSelectizeInput(session, "type", selected = type)
       updateTextInput(session, "asset_tag", value = modify_record$asset_tag)
+      updateCheckboxInput(session, "replaceableSensors", value = modify_record$holds_replaceable_sensors)
+      updateTextInput(session, "instrument_owner", value = modify_record$owner)
       updateDateInput(session, "date_in_service", value = modify_record$date_in_service)
       updateDateInput(session, "date_purchased", value = modify_record$date_purchased)
-      updateTextInput(session, "retired_by", value = modify_record$retired_by)
+
+      output$retired_by <- renderUI({
+        selectizeInput("retired_by", label = "Retired by", choices = select_data$recorder, selected = recorder)
+      })
       updateDateInput(session, "date_retired", value = modify_record$date_retired)
+
       updateActionButton(session, "save_cal_instrument", "Save edits")
-      shinyjs::hide("serial_no")
+      shinyjs::show("serial_no")
       shinyjs::show("date_retired")
       shinyjs::show("retired_by")
     } else if (input$existing_serial_no == "New record") {
       updateTextInput(session, "serial_no", value = "")
-      updateTextInput(session, "recorder", value = "")
+      output$recorder <- renderUI({
+        selectizeInput("recorder", label = "Observer name", choices = select_data$recorder, selected = "")
+      })
       updateSelectizeInput(session, "make", selected = "")
-      updateTextInput(session, "model", value = "")
+      updateSelectInput(session, "model", selected = "")
       updateSelectizeInput(session, "type", selected = "")
       updateTextInput(session, "asset_tag", value = "")
-      updateTextInput(session, "retired_by", value = "")
+      output$retired_by <- renderUI({
+        selectizeInput("retired_by", label = "Retired by", choices = select_data$recorder, selected = "")
+      })
       updateDateInput(session, "date_retired", value = NA)
       updateActionButton(session, "save_cal_instrument", "Save new instrument")
       shinyjs::show("serial_no")
@@ -1350,7 +1395,7 @@ table.on("click", "tr", function() {
 
   observeEvent(input$save_cal_instrument, { #save the new record or the changes to existing record
     #reload instruments_data$sheet to mitigate conflicts
-    instruments_data$sheet <- DBI::dbGetQuery(pool, "SELECT i.instrument_id, i.obs_datetime, CONCAT(observers.observer_first, ' ', observers.observer_last) AS observer, i.holds_replaceable_sensors, i.serial_no, i.asset_tag, i.date_in_service, i.date_purchased, i.retired_by, i.date_retired, instrument_make.make, instrument_model.model, instrument_type.type FROM instruments AS i LEFT JOIN instrument_make ON i.make = instrument_make.make_id LEFT JOIN instrument_model ON i.model = instrument_model.model_id LEFT JOIN instrument_type ON i.type = instrument_type.type_id LEFT JOIN observers ON i.observer = observers.observer_id ORDER BY i.instrument_id")
+    instruments_data$sheet <- DBI::dbGetQuery(pool, "SELECT i.instrument_id, i.obs_datetime,  CONCAT(observers.observer_first, ' ', observers.observer_last, '(', observers.organization, ')') AS observer, i.holds_replaceable_sensors, i.serial_no, i.asset_tag, i.date_in_service, i.date_purchased, i.retired_by, i.date_retired, instrument_make.make, instrument_model.model, instrument_type.type, i.owner FROM instruments AS i LEFT JOIN instrument_make ON i.make = instrument_make.make_id LEFT JOIN instrument_model ON i.model = instrument_model.model_id LEFT JOIN instrument_type ON i.type = instrument_type.type_id LEFT JOIN observers ON i.observer = observers.observer_id ORDER BY i.instrument_id")
 
     if (nrow(instruments_data$sheet) == 0) { #if there are no instruments listed yet...
       check <- FALSE #definitely does not exist yet
@@ -1376,6 +1421,7 @@ table.on("click", "tr", function() {
                                     asset_tag = gsub("[^[:alnum:]]", "", input$asset_tag),
                                     date_in_service = if (length(input$date_in_service) < 1) NA else as.character(input$date_in_service),
                                     date_purchased = if (length(input$date_purchased) < 1) NA else as.character(input$date_purchased),
+                                    owner = input$instrument_owner,
                                     retired_by = input$retired_by,
                                     date_retired = if (length(input$date_retired) < 1) NA else as.character(input$date_retired))
         DBI::dbAppendTable(pool, "instruments", instrument.df)
@@ -1385,7 +1431,7 @@ table.on("click", "tr", function() {
         new_entry <- TRUE
       }
     } else { #Modify an existing entry
-      if (nchar(input$recorder) < 1 | nchar(input$make) < 1 | nchar(input$model) < 1 | nchar(input$type) < 1 | (nchar(input$serial_no) < 4 | (grepl("Search", input$serial_no, ignore.case = TRUE)))) { #long statement to check if all entries are satisfactorily filled in.
+      if (nchar(input$recorder) < 1 | nchar(input$make) < 1 | nchar(input$model) < 1 | nchar(input$type) < 1 | (nchar(input$serial_no) < 4 | nchar(input$instrument_owner) < 1 | (grepl("Search", input$serial_no, ignore.case = TRUE)))) { #long statement to check if all entries are satisfactorily filled in.
         shinyalert::shinyalert("Unfilled mandatory entries!", text = "You need to provide your name, instrument make, model, type, and serial number of minimum 2 characters.", type = "error")
         new_entry <- FALSE
       } else {
@@ -1401,14 +1447,16 @@ table.on("click", "tr", function() {
                                     asset_tag = gsub("[^[:alnum:]]", "", input$asset_tag),
                                     date_in_service = if (length(input$date_in_service) < 1) NA else as.character(input$date_in_service),
                                     date_purchased = if (length(input$date_purchased) < 1) NA else as.character(input$date_purchased),
+                                    owner = input$instrument_owner,
                                     retired_by = input$retired_by,
                                     date_retired = if (length(input$date_retired) < 1) NA else as.character(input$date_retired))
 
         DBI::dbExecute(pool, paste0("UPDATE instruments SET observer = ", input$recorder,
                                     ", obs_datetime = '", as.character(.POSIXct(Sys.time(), tz = "MST")),
-                                    "', make = ", make,
-                                    ", model = '", model,
-                                    ", type = '", type,
+                                    "', make = ", input$make,
+                                    ", model = ", input$model,
+                                    ", type = ", input$type,
+                                    ", owner = '", input$instrument_owner,
                                     ", holds_replaceable_sensors = ", input$replaceableSensors,
                                     ", asset_tag = '", gsub("[^[:alnum:]]", "", input$asset_tag),
                                     "', date_in_service = '", if (length(input$date_in_service) < 1) NA else as.character(input$date_in_service),
@@ -1416,20 +1464,18 @@ table.on("click", "tr", function() {
                                     "', retired_by = '", input$retired_by,
                                     "', date_retired = '", if (length(input$date_retired) < 1) NA else as.character(input$date_retired),
                                     "' WHERE serial_no = '", input$existing_serial_no, "'"))
-        shinyalert::shinyalert(paste0("Serial number ", input$serial_no, " modified"), type = "success", timer = 2000)
+        shinyalert::shinyalert(paste0("Serial number ", input$existing_serial_no, " modified"), type = "success", timer = 2000)
         new_entry <- TRUE
       }
     }
     if (new_entry) {
       #Reload the instruments sheet to integrate modifications
-      #TODO: This step could be avoided by simply adding the row or modifying a row in instruments_data$sheet and not re-reading.
-
-      instruments_sheet <- DBI::dbReadTable(pool, "instruments")
-      instruments_data$sheet <- instruments_sheet #assign to a reactive
-
-      instruments_data$handhelds <- instruments_sheet[instruments_sheet$type == "Handheld (connects to bulkheads)" & is.na(instruments_sheet$date_retired) , ]
-      instruments_data$others <- instruments_sheet[instruments_sheet$type != "Handheld (connects to bulkheads)" & is.na(instruments_sheet$date_retired) , ]
+      instruments_sheet <- DBI::dbGetQuery(pool, "SELECT i.instrument_id, i.obs_datetime,  CONCAT(observers.observer_first, ' ', observers.observer_last, '(', observers.organization, ')') AS observer, i.holds_replaceable_sensors, i.serial_no, i.asset_tag, i.date_in_service, i.date_purchased, i.retired_by, i.date_retired, instrument_make.make, instrument_model.model, instrument_type.type, i.owner FROM instruments AS i LEFT JOIN instrument_make ON i.make = instrument_make.make_id LEFT JOIN instrument_model ON i.model = instrument_model.model_id LEFT JOIN instrument_type ON i.type = instrument_type.type_id LEFT JOIN observers ON i.observer = observers.observer_id ORDER BY i.instrument_id")
+      instruments_data$sheet <- instruments_sheet
+      instruments_data$handhelds <- instruments_sheet[instruments_sheet$type == "Handheld" & is.na(instruments_sheet$date_retired) , ]
+      instruments_data$others <- instruments_sheet[instruments_sheet$type != "Handheld" & is.na(instruments_sheet$date_retired) , ]
       instruments_data$maintainable <- instruments_sheet[instruments_sheet$type %in% c("Sonde", "Bulkhead") , ]
+
       #Reset some fields, show/hide others
       updateSelectizeInput(session, "existing_serial_no", choices = c("New record", instruments_data$sheet$serial_no), selected = instrument.df$serial_no)
       updateTextInput(session, "serial_no", value = "")
@@ -1453,9 +1499,9 @@ table.on("click", "tr", function() {
       shinyjs::show("retired_by")
       updateActionButton(session, "save_cal_instrument", "Save edits")
       #Re-render the tables
-      instruments_data$manage_instruments <- instruments_data$sheet[ , !colnames(instruments_data$sheet) %in% c("instrument_id", "observer", "obs_datetime", "holds_replaceable_sensors")]
+      instruments_data$manage_instruments <- instruments_data$sheet[ , !colnames(instruments_data$sheet) %in% c("instrument_id", "observer", "obs_datetime")]
       output$manage_instruments_table <- DT::renderDataTable(instruments_data$manage_instruments, rownames = FALSE, selection = "single")
-      temp_table <- instruments_data$maintainable[, c("make", "model", "type", "serial_no")]
+      temp_table <- instruments_data$maintainable[, c("make", "model", "type", "serial_no", "owner")]
       temp_table$type <- gsub(" .*", "", temp_table$type)
       output$manage_sensors_table <- DT::renderDataTable(temp_table, rownames = FALSE, selection = "single")
     }

@@ -165,18 +165,19 @@ app_ui <- function(request) {
           "Manage instruments",
           sidebarLayout(
             sidebarPanel(
-              selectizeInput("existing_serial_no", "Search existing serial numbers", choices = "New record"),
+              selectizeInput("existing_serial_no", "Search serial numbers or 'New record' for a new instrument'", choices = "New record"),
               textInput("serial_no", "New serial no (add alias by appending to serial #, e.g. 012345Blue)", value = "Search first!"),
-              selectizeInput("recorder", label = "Observer name", choices = "placeholder"),
+              renderUI("recorder"),
               selectizeInput("make", label = "Instrument make", choices = "placeholder"),
               selectizeInput("model", label = "Instrument model", choices = "placeholder"),
               selectizeInput("type", label = "Instrument type", choices = "placeholder"),
+              textInput("instrument_owner", "Instrument owner", value = ""),
               checkboxInput("replaceableSensors", "Replaceable sensors?", value = FALSE),
               textInput("asset_tag", "Asset tag number", value = ""),
               dateInput("date_in_service", label = "Date in service"),
               dateInput("date_purchased", label = "Date purchased"),
               dateInput("date_retired", label = "Date retired"),
-              textInput("retired_by", label = "Retired by", value = ""),
+              renderUI("retired_by"),
               actionButton("save_cal_instrument", "Save new instrument")
             ),
             mainPanel(
