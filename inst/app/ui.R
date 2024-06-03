@@ -58,11 +58,12 @@ app_ui <- function(request) {
               conditionalPanel(
                 condition = "input.selection == 'Basic calibration info'",
                 uiOutput("observer"),
-                shinyWidgets::airDatepickerInput("obs_datetime", label = "Calibration date/time", value = Sys.time(), range = FALSE, multiple = FALSE, timepicker = TRUE, maxDate = Sys.Date() + 1, startView = Sys.Date(), update_on = "close", timepickerOpts = shinyWidgets::timepickerOptions(minutesStep = 15, timeFormat = "HH:mm")),
+                shinyWidgets::airDatepickerInput("obs_datetime", label = "Calibration date/time", value = .POSIXct(Sys.time(), tz = "MST"), range = FALSE, multiple = FALSE, timepicker = TRUE, maxDate = Sys.Date() + 1, startView = Sys.Date(), update_on = "close", timepickerOpts = shinyWidgets::timepickerOptions(minutesStep = 15, timeFormat = "HH:mm")),
                 textOutput("instrument_reminder"),
                 uiOutput("ID_sensor_holder"),
                 uiOutput("ID_handheld_meter"),
-                actionButton("save_basic_info", "Save this sheet")
+                actionButton("save_basic_info", "Save this sheet"),
+                actionButton("submit_btn", "Finalize and submit calibration")
               ),
               conditionalPanel(
                 condition = "input.selection == 'pH calibration'",
@@ -162,7 +163,7 @@ app_ui <- function(request) {
           )
         ),
         tabPanel(
-          "Manage instruments",
+          "Add/modify instruments",
           sidebarLayout(
             sidebarPanel(
               selectizeInput("existing_serial_no", "Search serial numbers or 'New record' for a new instrument'", choices = "New record"),
@@ -186,7 +187,13 @@ app_ui <- function(request) {
           )
         ),
         tabPanel(
-          "Manage sensors and log maintenance",
+          "Maintain instruments",
+          mainPanel(
+            textOutput("maintain_instrument_placeholder")
+          )
+        ),
+        tabPanel(
+          "Change/maintain sensors",
           sidebarLayout(
             sidebarPanel(
               textOutput("sensors_reminder"),
@@ -219,13 +226,20 @@ app_ui <- function(request) {
               DT::dataTableOutput("sensor6_details"),
               DT::dataTableOutput("sensor7_details"),
               DT::dataTableOutput("sensor8_details"),
-              selectizeInput("change_sensor", "Assign a new sensor", choices = "placeholder"),
+              htmlOutput("sensor_change_note"),
+              selectizeInput("change_sensor", "Assign a new sensor or leave as-is to log only maintenance note", choices = "placeholder", width = "500px"),
               selectizeInput("add_sensor_serial", "Serial number (type your own if not in yet)", choices = NULL, options = list(create = TRUE)),
               actionButton("add_new_sensor_serial2", "Add new sensor to database"),
-              textAreaInput("add_comment", "Add a note", "", height = "100px"),
+              textAreaInput("add_comment", "Add a note", "", height = "100px", width = "800px"),
               uiOutput("sensor_change_name"),
               actionButton("submit_sensor_change", "Submit new record")
             )
+          )
+        ),
+        tabPanel(
+          "Deploy/Recover instruments",
+          mainPanel(
+            textOutput("deploy_instrument_placeholder")
           )
         ),
         tabPanel(
