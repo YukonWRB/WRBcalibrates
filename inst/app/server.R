@@ -139,11 +139,12 @@ table.on("click", "tr", function() {
   sensors_data$sensor_types <- DBI::dbGetQuery(pool, paste0("SELECT * FROM sensor_types"))
 
   # Create initial tables for managing instruments
-  initial_manage_instruments_table <- instruments_sheet[is.na(instruments_sheet$date_retired), !colnames(instruments_sheet) %in% c("instrument_id", "observer", "obs_datetime")]
+  initial_manage_instruments_table <- instruments_sheet[ , !colnames(instruments_sheet) %in% c("instrument_id", "observer", "obs_datetime")]
+  initial_calibrate_instruments_table <- instruments_sheet[is.na(instruments_sheet$date_retired), !colnames(instruments_sheet) %in% c("instrument_ID", "observer", "obs_datetime", "retired_by", "date_retired", "date_purchased", "date_in_service")]
   output$manage_instruments_table <- DT::renderDataTable(initial_manage_instruments_table, rownames = FALSE, selection = "single")
   output$calibration_instruments_table <- DT::renderDataTable({
     DT::datatable(
-      initial_manage_instruments_table,
+      initial_calibrate_instruments_table,
       rownames = FALSE,
       selection = "multiple",
       callback = htmlwidgets::JS(table_reset)
@@ -533,15 +534,7 @@ table.on("click", "tr", function() {
 
   observeEvent(input$selection, {
     if (input$selection == "Basic calibration info") {
-      instruments_data$manage_instruments <- instruments_data$sheet[ , !colnames(instruments_data$sheet) %in% c("instrument_ID", "observer", "obs_datetime")]
-      output$calibration_instruments_table <- DT::renderDT({
-        DT::datatable(
-          instruments_data$manage_instruments,
-          rownames = FALSE,
-          selection = "multiple",
-          callback = htmlwidgets::JS(table_reset)
-        )
-      }, server = TRUE)
+
       shinyjs::show("calibration_instruments_table")
     } else {
       shinyjs::hide("calibration_instruments_table")
@@ -724,7 +717,7 @@ table.on("click", "tr", function() {
       if (initial_instr_table$value) {
         output$calibration_instruments_table <- DT::renderDT({
           DT::datatable(
-            initial_manage_instruments_table,
+            initial_calibrate_instruments_table,
             rownames = FALSE,
             selection = "multiple",
             callback = htmlwidgets::JS(table_reset)
@@ -733,7 +726,7 @@ table.on("click", "tr", function() {
       } else {
         output$calibration_instruments_table <- DT::renderDT({
           DT::datatable(
-            instruments_data$manage_instruments,
+            instruments_data$calibrate_instruments,
             rownames = FALSE,
             selection = "multiple",
             callback = htmlwidgets::JS(table_reset)
@@ -1566,7 +1559,7 @@ table.on("click", "tr", function() {
         new_entry <- TRUE
       }
     }
-    if (new_entry) {
+
       #Reload the instruments sheet to integrate modifications
       instruments_sheet <- DBI::dbGetQuery(pool, "SELECT i.instrument_id, i.obs_datetime,  CONCAT(observers.observer_first, ' ', observers.observer_last, '(', observers.organization, ')') AS observer, i.holds_replaceable_sensors, i.serial_no, i.asset_tag, i.date_in_service, i.date_purchased, i.retired_by, i.date_retired, instrument_make.make, instrument_model.model, instrument_type.type, i.owner FROM instruments AS i LEFT JOIN instrument_make ON i.make = instrument_make.make_id LEFT JOIN instrument_model ON i.model = instrument_model.model_id LEFT JOIN instrument_type ON i.type = instrument_type.type_id LEFT JOIN observers ON i.observer = observers.observer_id ORDER BY i.instrument_id")
       instruments_data$sheet <- instruments_sheet
@@ -1602,7 +1595,16 @@ table.on("click", "tr", function() {
       temp_table <- instruments_data$maintainable_sensors[, c("make", "model", "type", "serial_no", "owner")]
       temp_table$type <- gsub(" .*", "", temp_table$type)
       output$manage_sensors_table <- DT::renderDataTable(temp_table, rownames = FALSE, selection = "single")
-    }
+
+      instruments_data$calibrate_instruments <- instruments_data$sheet[ , !colnames(instruments_data$sheet) %in% c("instrument_ID", "observer", "obs_datetime", "retired_by", "date_retired", "date_purchased", "date_in_service")]
+      output$calibration_instruments_table <- DT::renderDT({
+        DT::datatable(
+          instruments_data$calibrate_instruments,
+          rownames = FALSE,
+          selection = "multiple",
+          callback = htmlwidgets::JS(table_reset)
+        )
+      }, server = TRUE)
   }, ignoreInit = TRUE)
 
 
@@ -1699,7 +1701,7 @@ table.on("click", "tr", function() {
       output$observer <- renderUI({
         selectizeInput("observer", label = "Calibrator name", choices = select_data$recorder, selected = select_data$recorder[calibrations$incomplete_calibrations[restart_value, "observer"]])
       })
-      shinyWidgets::updateAirDateInput(session, "obs_datetime", value = calibrations$incomplete_calibrations[restart_value, "obs_datetime"])
+      shinyWidgets::updateAirDateInput(session, "obs_datetime", value = calibrations$incomplete_calibrations[restart_value, "obs_datetime"] - 7 * 60 * 60)
       output$ID_sensor_holder <- renderUI({
         div(
           selectizeInput("ID_sensor_holder", label = "Logger/bulkhead/sonde serial #", choices = c("", instruments_data$others$serial_no),
@@ -1880,315 +1882,6 @@ table.on("click", "tr", function() {
   }, ignoreInit = TRUE)
 
 
-  # Validation checks ##############################################################################
-  ### pH checks ##############################################################################
-  validation_check$pH <- FALSE
-  observeEvent(input$validate_pH, {
-    tryCatch({
-      #Check the standard values entered
-      std1 <- as.numeric(input$pH1_std)
-      std2 <- as.numeric(input$pH2_std)
-      std3 <- as.numeric(input$pH3_std)
-      warn_ph_std <- FALSE
-      warn_ph_post <- FALSE
-      warn_mv_post <- FALSE
-      if (std1 != 4) {
-        shinyjs::js$backgroundCol("pH1_std", "lemonchiffon")
-        warn_ph_std <- TRUE
-      } else {
-        shinyjs::js$backgroundCol("pH1_std", "white")
-        warn_ph_std <- FALSE
-      }
-      if (std2 != 7) {
-        shinyjs::js$backgroundCol("pH2_std", "lemonchiffon")
-        warn_ph_std <- TRUE
-      } else {
-        shinyjs::js$backgroundCol("pH2_std", "white")
-        warn_ph_std <- FALSE
-      }
-      if (std3 != 10) {
-        shinyjs::js$backgroundCol("pH3_std", "lemonchiffon")
-        warn_ph_std <- TRUE
-      } else {
-        shinyjs::js$backgroundCol("pH3_std", "white")
-        warn_ph_std <- FALSE
-      }
-      #Validate the pH measurements vs the standards
-      value1 <- as.numeric(input$pH1_post_val)
-      if (value1 < (std1 - 0.1) | value1 > (std1 + 0.1) | is.null(value1)) { #tolerance of 0.1 pH units from the stated calibration standard value
-        shinyjs::js$backgroundCol("pH1_post_val", "red")
-        warn_ph_post <- TRUE
-      } else {
-        shinyjs::js$backgroundCol("pH1_post_val", "white")
-      }
-      value2 <- as.numeric(input$pH2_post_val)
-      if (value2 < (std2 - 0.1) | value2 > (std2 + 0.1) | is.null(value2)) { #tolerance of 0.1 pH units from the stated calibration standard value
-        shinyjs::js$backgroundCol("pH2_post_val", "red")
-        warn_ph_post <- TRUE
-      } else {
-        shinyjs::js$backgroundCol("pH2_post_val", "white")
-      }
-      value3 <- as.numeric(input$pH3_post_val)
-      if (value3 < (std3 - 0.1) | value3 > (std3 + 0.1) | is.null(value3)) { #tolerance of 0.1 pH units from the stated calibration standard value
-        shinyjs::js$backgroundCol("pH3_post_val", "red")
-        warn_ph_post <- TRUE
-      } else {
-        shinyjs::js$backgroundCol("pH3_post_val", "white")
-      }
-      # Validate the mV readings
-      pH1_mV <- as.numeric(input$pH1_mV)
-      pH2_mV <- as.numeric(input$pH2_mV)
-      pH3_mV <- as.numeric(input$pH3_mV)
-      if ((pH1_mV < (165 + pH2_mV)) | (pH1_mV > (180 + pH2_mV)) & (std1 > 3.9 & std1 < 4.1)) {
-        shinyjs::js$backgroundCol("pH1_mV", "red")
-        warn_mv_post <- TRUE
-      } else if (std1 != 4) {
-        shinyjs::js$backgroundCol("pH1_mV", "lemonchiffon")
-      } else {
-        shinyjs::js$backgroundCol("pH1_mV", "white")
-      }
-      if ((pH2_mV > 50 | pH2_mV < -50) & (std2 > 6.9 & std2 < 7.1)) {
-        shinyjs::js$backgroundCol("pH2_mV", "red")
-        warn_mv_post <- TRUE
-      } else if (std2 != 7) {
-        shinyjs::js$backgroundCol("pH2_mV", "lemonchiffon")
-      } else {
-        shinyjs::js$backgroundCol("pH2_mV", "white")
-      }
-      if ((pH3_mV > (pH2_mV - 165)) | (pH3_mV < (pH2_mV - 180)) & (std3 > 9.9 & std3 < 10.1)) {
-        shinyjs::js$backgroundCol("pH3_mV", "red")
-        warn_mv_post <- TRUE
-      } else if (std3 != 10) {
-        shinyjs::js$backgroundCol("pH3_mV", "lemonchiffon")
-      } else {
-        shinyjs::js$backgroundCol("pH3_mV", "white")
-      }
-      #TODO: chain these shinyalerts together
-      if (warn_ph_std) {
-        shinyalert::shinyalert(title = "Are you sure your standards are correct? If yes, checks on mV outputs will be invalid; use your judgement.", type = "warning")
-      }
-      if (warn_ph_post) {
-        shinyalert::shinyalert(title = "Some of your post calibration pH values are > 0.1 units from their standards! Check your inputs.", type = "warning")
-      }
-      if (warn_mv_post) {
-        shinyalert::shinyalert(title = "Some of your post calibration mV values are outside of the valid range!", text = "Re-check your measurements, and if the problem persists consider replacing the electrode (step 1) or entire sensor (last resort). ", type = "warning")
-      }
-      validation_check$pH <- TRUE
-      if (!warn_ph_std & !warn_ph_post & !warn_mv_post) {
-        shinyalert::shinyalert(title = "Good to go!", type = "success", timer = 2000)
-      }
-    }, error = function(e) {
-      shinyalert::shinyalert(title = "You have unfilled mandatory entries", text = "If doing a 2-point calibration enter 0 for the third solution values to pass this check.", type = "error")
-    })
-  }, ignoreInit = TRUE)
-
-  ### ORP checks ##############################################################################
-  validation_check$orp <- FALSE
-  observeEvent(input$validate_orp, {
-    tryCatch({
-      orp_std <- input$orp_std
-      orp_post <- input$orp_post_mV
-      orp_diff <- abs(orp_std - orp_post)
-      if (orp_diff > 5) {
-        shinyjs::js$backgroundCol("orp_std", "red")
-        shinyjs::js$backgroundCol("orp_post_mV", "red")
-      } else if (orp_diff > 5) {
-        shinyjs::js$backgroundCol("orp_std", "lemonchiffon")
-        shinyjs::js$backgroundCol("orp_post_mV", "lemonchiffon")
-      } else {
-        shinyjs::js$backgroundCol("orp_std", "white")
-        shinyjs::js$backgroundCol("orp_post_mV", "white")
-        shinyalert::shinyalert(title = "Good to go!", type = "success", timer = 2000)
-      }
-      validation_check$orp <- TRUE
-    }, error = function(e) {
-      shinyalert::shinyalert(title = "You have unfilled mandatory entries", type = "error", timer = 2000)
-    })
-  }, ignoreInit = TRUE)
-
-  ### Temperature checks ##############################################################################
-  validation_check$temp <- FALSE
-  observeEvent(input$validate_temp, {
-    tryCatch({
-      temp_re_type <- input$temp_reference_desc
-      temp_ref <- input$temp_reference
-      temp_meas <- input$temp_observed
-      temp_diff <- abs(temp_ref - temp_meas)
-      if (temp_diff > 0.2) {
-        shinyjs::js$backgroundCol("temp_observed", "red")
-        shinyjs::js$backgroundCol("temp_reference", "red")
-        shinyalert::shinyalert(title = "Warning: double check your temperature, consider replacing this sensor!", type = "warning", timer = 2000)
-      } else if (temp_diff > 0.1) {
-        shinyjs::js$backgroundCol("temp_observed", "lemonchiffon")
-        shinyjs::js$backgroundCol("temp_reference", "lemonchiffon")
-        shinyalert::shinyalert(title = "Warning: double check your temperature, consider replacing this sensor!", type = "warning", timer = 2000)
-      } else {
-        shinyjs::js$backgroundCol("temp_observed", "white")
-        shinyjs::js$backgroundCol("temp_reference", "white")
-        shinyalert::shinyalert(title = "Good to go!", type = "success", timer = 2000)
-      }
-      validation_check$temp <- TRUE
-    }, error = function(e) {
-      shinyalert::shinyalert(title = "You have unfilled mandatory entries", type = "error", timer = 2000)
-    })
-  }, ignoreInit = TRUE)
-
-  ### SpC checks ##############################################################################
-  validation_check$SpC <- FALSE
-  observeEvent(input$validate_SpC, {
-    if (input$spc_or_not & is.null(calibration_data$temp)) {
-      shinyalert::shinyalert("Calibrate temperature first!", "You must calibrate temperature first if entering non-specific conductivity")
-    } else {
-      tryCatch({
-        SpC1_ref <- input$SpC1_std
-        SpC2_ref <- input$SpC2_std
-        SpC1_post <- if (input$spc_or_not) input$SpC1_post/(1 + 0.02*(calibration_data$temp$temp_reference - 25)) else input$SpC1_post
-        SpC2_post <- if (input$spc_or_not) input$SpC2_post/(1 + 0.02*(calibration_data$temp$temp_reference - 25)) else input$SpC2_post
-        SpC1_diff <- abs(SpC1_ref - SpC1_post)
-        SpC2_diff <- abs(SpC2_ref - SpC2_post)
-        gtg1 <- FALSE
-        gtg2 <- FALSE
-        if (SpC1_diff > 10) {
-          shinyjs::js$backgroundCol("SpC1_std", "red")
-          shinyjs::js$backgroundCol("SpC1_post", "red")
-          if (input$spc_or_not) {
-            shinyalert::shinyalert("Warning: double check your values", paste0("Your low-range input converts to an SpC of ", round(SpC1_post, 0), " versus the expected ", SpC1_ref))
-          } else {
-            shinyalert::shinyalert(title = "Warning: double check your values", type = "warning", timer = 2000)
-          }
-        } else if (SpC1_diff > 5) {
-          shinyjs::js$backgroundCol("SpC1_std", "lemonchiffon")
-          shinyjs::js$backgroundCol("SpC1_post", "lemonchiffon")
-          if (input$spc_or_not) {
-            shinyalert::shinyalert("Warning: double check your values", paste0("Your low_range input converts to an SpC of ", round(SpC1_post, 0), " versus the expected ", SpC1_ref))
-          } else {
-            shinyalert::shinyalert(title = "Warning: double check your values", type = "warning", timer = 2000)
-          }
-        } else {
-          gtg1 <- TRUE
-          shinyjs::js$backgroundCol("SpC1_std", "white")
-          shinyjs::js$backgroundCol("SpC1_post", "white")
-        }
-        if (SpC2_diff > 10) {
-          shinyjs::js$backgroundCol("SpC2_std", "red")
-          shinyjs::js$backgroundCol("SpC2_post", "red")
-          if (input$spc_or_not) {
-            shinyalert::shinyalert("Warning: double check your values", paste0("Your high-range input converts to an SpC of ", round(SpC2_post, 0), " versus the expected ", SpC2_ref))
-          } else {
-            shinyalert::shinyalert(title = "Warning: double check your values", type = "warning", timer = 2000)
-          }
-        } else if (SpC2_diff > 5) {
-          shinyjs::js$backgroundCol("SpC2_std", "lemonchiffon")
-          shinyjs::js$backgroundCol("SpC2_post", "lemonchiffon")
-          shinyalert::shinyalert(title = "Warning: double check your values", type = "warning", timer = 2000)
-          if (input$spc_or_not) {
-            shinyalert::shinyalert("Warning: double check your values", paste0("Your high-range input converts to an SpC of ", round(SpC2_post, 0), " versus the expected ", SpC2_ref))
-          } else {
-            shinyalert::shinyalert(title = "Warning: double check your values", type = "warning", timer = 2000)
-          }
-        } else {
-          gtg2 <- TRUE
-          shinyjs::js$backgroundCol("SpC2_std", "white")
-          shinyjs::js$backgroundCol("SpC2_post", "white")
-        }
-        if (gtg1 & gtg2) {
-          shinyalert::shinyalert(title = "Good to go!", type = "success", timer = 2000)
-        }
-        validation_check$SpC <- TRUE
-      }, error = function(e) {
-        shinyalert::shinyalert(title = "You have unfilled mandatory entries", type = "error", timer = 2000)
-      })
-    }
-  }, ignoreInit = TRUE)
-
-  ### Turbidity checks ##############################################################################
-  validation_check$turb <- FALSE
-  observeEvent(input$validate_turb, {
-    tryCatch({
-      turb1_ref <- input$turb1_std
-      turb2_ref <- input$turb2_std
-      turb1_post <- input$turb1_post
-      turb2_post <- input$turb2_post
-      turb1_diff <- abs(turb1_ref - turb1_post)
-      turb2_diff <- abs(turb2_ref - turb2_post)
-      gtg1 <- FALSE
-      gtg2 <- FALSE
-      if (turb1_diff > 10) {
-        shinyjs::js$backgroundCol("turb1_std", "red")
-        shinyjs::js$backgroundCol("turb1_post", "red")
-      } else if (turb1_diff > 5) {
-        shinyjs::js$backgroundCol("turb1_std", "lemonchiffon")
-        shinyjs::js$backgroundCol("turb1_post", "lemonchiffon")
-      } else {
-        shinyjs::js$backgroundCol("turb1_std", "white")
-        shinyjs::js$backgroundCol("turb1_post", "white")
-        gtg1 <- TRUE
-      }
-      if (turb2_diff > 10) {
-        shinyjs::js$backgroundCol("turb2_std", "red")
-        shinyjs::js$backgroundCol("turb2_post", "red")
-      } else if (turb2_diff > 5) {
-        shinyjs::js$backgroundCol("turb2_std", "lemonchiffon")
-        shinyjs::js$backgroundCol("turb2_post", "lemonchiffon")
-      } else {
-        shinyjs::js$backgroundCol("turb2_std", "white")
-        shinyjs::js$backgroundCol("turb2_post", "white")
-        gtg2 <- TRUE
-      }
-      if (gtg1 & gtg2) {
-        shinyalert::shinyalert(title = "Good to go!", type = "success", timer = 2000)
-      } else {
-        shinyalert::shinyalert(title = "Your post-cal values are a bit off from the standard. Please check you entries before moving on.", type = "warning", timer = 2000)
-      }
-      validation_check$turb <- TRUE
-    }, error = function(e) {
-      shinyalert::shinyalert(title = "You have unfilled mandatory entries", type = "error", timer = 2000)
-    })
-  }, ignoreInit = TRUE)
-
-  ### DO checks ##############################################################################
-  validation_check$DO <- FALSE
-  observeEvent(input$validate_DO, {
-    NFG <- FALSE
-    tryCatch({
-      baro_post <- input$baro_press_post
-      DO_post <- input$DO_post
-      if (baro_post < 600 | baro_post > 800) {
-        shinyalert::shinyalert(title = "Baro pressures are not in range", "You must enter baro pressure in mmHg", type = "error", timer = 2000)
-        validation_check$DO <- FALSE
-        NFG <- TRUE
-      }
-      if (DO_post < 1 | DO_post > 15) {
-        shinyalert::shinyalert(title = "DO post-calibration values are out of range", "Are you sure you entered % and mg/l in the right boxes? Only mg/l is saved, use the Fill/recalculate button.", type = "error", timer = 5000)
-        validation_check$DO <- FALSE
-        NFG <- TRUE
-      }
-      if (!NFG) {
-        shinyalert::shinyalert(title = "Good to go!", type = "success", timer = 2000)
-        validation_check$DO <- TRUE
-      }
-    }, error = function(e) {
-      shinyalert::shinyalert(title = "You have unfilled mandatory entries", "Baro pressure and DO in mg/l are mandatory", type = "error", timer = 4000)
-    })
-  }, ignoreInit = TRUE)
-
-  ### Depth checks ##############################################################################
-  validation_check$depth <- FALSE
-  observeEvent(input$validate_depth, { #Deal with depth
-    tryCatch({
-      depth_check <- input$depth_check_ok
-      depth_change <- input$depth_changes_ok
-      if (depth_check == "TRUE" & depth_change == "TRUE") {
-        shinyalert::shinyalert(title = "Good to go!", type = "success", timer = 2000)
-      } else {
-        shinyalert::shinyalert(title = "You indicated FALSE or Not Checked for one of the values. Are you sure about that? Should you be using a different sensor?", type = "warning")
-      }
-      validation_check$depth <- TRUE
-    }, error = function(e) {
-      shinyalert::shinyalert(title = "You have unfilled mandatory entries", type = "error", timer = 2000)
-    })
-  }, ignoreInit = TRUE)
-
   # Calibration data saving, updating, and deleting #########################################################
   # Chastise the user if they try to move on without saving basic info
   observeEvent(input$selection, {
@@ -2254,10 +1947,120 @@ table.on("click", "tr", function() {
       })
   }, ignoreInit = TRUE)
 
-  ### Save/Delete pH ##############################################################################
+  ## Validate/Save/Delete pH ##############################################################################
   observeEvent(input$save_cal_pH, {
-    if (validation_check$pH) {
+    validation_check$pH <- FALSE
+      tryCatch({
+        #Check the standard values entered
+        std1 <- as.numeric(input$pH1_std)
+        std2 <- as.numeric(input$pH2_std)
+        std3 <- as.numeric(input$pH3_std)
+        warn_ph_std <- FALSE
+        warn_ph_post <- FALSE
+        warn_mv_post <- FALSE
+        if (std1 != 4) {
+          shinyjs::js$backgroundCol("pH1_std", "lemonchiffon")
+          warn_ph_std <- TRUE
+        } else {
+          shinyjs::js$backgroundCol("pH1_std", "white")
+          warn_ph_std <- FALSE
+        }
+        if (std2 != 7) {
+          shinyjs::js$backgroundCol("pH2_std", "lemonchiffon")
+          warn_ph_std <- TRUE
+        } else {
+          shinyjs::js$backgroundCol("pH2_std", "white")
+          warn_ph_std <- FALSE
+        }
+        if (std3 != 10) {
+          shinyjs::js$backgroundCol("pH3_std", "lemonchiffon")
+          warn_ph_std <- TRUE
+        } else {
+          shinyjs::js$backgroundCol("pH3_std", "white")
+          warn_ph_std <- FALSE
+        }
+        #Validate the pH measurements vs the standards
+        value1 <- as.numeric(input$pH1_post_val)
+        if (value1 < (std1 - 0.1) | value1 > (std1 + 0.1) | is.null(value1)) { #tolerance of 0.1 pH units from the stated calibration standard value
+          shinyjs::js$backgroundCol("pH1_post_val", "red")
+          warn_ph_post <- TRUE
+        } else {
+          shinyjs::js$backgroundCol("pH1_post_val", "white")
+        }
+        value2 <- as.numeric(input$pH2_post_val)
+        if (value2 < (std2 - 0.1) | value2 > (std2 + 0.1) | is.null(value2)) { #tolerance of 0.1 pH units from the stated calibration standard value
+          shinyjs::js$backgroundCol("pH2_post_val", "red")
+          warn_ph_post <- TRUE
+        } else {
+          shinyjs::js$backgroundCol("pH2_post_val", "white")
+        }
+        value3 <- as.numeric(input$pH3_post_val)
+        if (value3 < (std3 - 0.1) | value3 > (std3 + 0.1) | is.null(value3)) { #tolerance of 0.1 pH units from the stated calibration standard value
+          shinyjs::js$backgroundCol("pH3_post_val", "red")
+          warn_ph_post <- TRUE
+        } else {
+          shinyjs::js$backgroundCol("pH3_post_val", "white")
+        }
+        # Validate the mV readings
+        pH1_mV <- as.numeric(input$pH1_mV)
+        pH2_mV <- as.numeric(input$pH2_mV)
+        pH3_mV <- as.numeric(input$pH3_mV)
+        if ((pH1_mV < (165 + pH2_mV)) | (pH1_mV > (180 + pH2_mV)) & (std1 > 3.9 & std1 < 4.1)) {
+          shinyjs::js$backgroundCol("pH1_mV", "red")
+          warn_mv_post <- TRUE
+        } else if (std1 != 4) {
+          shinyjs::js$backgroundCol("pH1_mV", "lemonchiffon")
+        } else {
+          shinyjs::js$backgroundCol("pH1_mV", "white")
+        }
+        if ((pH2_mV > 50 | pH2_mV < -50) & (std2 > 6.9 & std2 < 7.1)) {
+          shinyjs::js$backgroundCol("pH2_mV", "red")
+          warn_mv_post <- TRUE
+        } else if (std2 != 7) {
+          shinyjs::js$backgroundCol("pH2_mV", "lemonchiffon")
+        } else {
+          shinyjs::js$backgroundCol("pH2_mV", "white")
+        }
+        if ((pH3_mV > (pH2_mV - 165)) | (pH3_mV < (pH2_mV - 180)) & (std3 > 9.9 & std3 < 10.1)) {
+          shinyjs::js$backgroundCol("pH3_mV", "red")
+          warn_mv_post <- TRUE
+        } else if (std3 != 10) {
+          shinyjs::js$backgroundCol("pH3_mV", "lemonchiffon")
+        } else {
+          shinyjs::js$backgroundCol("pH3_mV", "white")
+        }
+        if (warn_ph_std | warn_ph_post | warn_mv_post) {
+          warnings <- paste0(
+            if (warn_ph_std) "Are you sure your standards are correct? If yes, checks on mV outputs will be invalid; use your judgement.<br><br>" else "",
+            if (warn_ph_post) "Some of your post calibration pH values are > 0.1 units from their standards! Check your inputs.<br><br>" else "",
+            if (warn_mv_post) "Post calibration mV values are outside of the valid range; consider replacing the electrode or sensor."
+          )
+          # Show a modal to the user to confirm that they are sure about their entries
+          showModal(modalDialog(
+            title = "Are you sure?",
+            HTML(warnings),
+            footer = tagList(
+              actionButton("ok_check_ph", "Yes, I'm sure"),
+              modalButton("Cancel")
+            )
+          ))
+        } else {
+          validation_check$pH <- TRUE
+        }
+      }, error = function(e) {
+        shinyalert::shinyalert(title = "You have unfilled mandatory entries", text = "If doing a 2-point calibration enter 0 for the third solution values to pass this check.", type = "error")
+      })
+  }, ignoreInit = TRUE)
 
+  observeEvent(input$ok_check_ph, {
+    removeModal()
+    validation_check$pH <- TRUE
+  }, ignoreInit = TRUE)
+
+observeEvent(validation_check$pH, {
+    if (!validation_check$pH) {
+      return()
+    } else {
       calibration_data$pH <- data.frame(calibration_id = calibration_data$next_id,
                                         ph1_std = input$pH1_std,
                                         ph2_std = input$pH2_std,
@@ -2304,8 +2107,6 @@ table.on("click", "tr", function() {
       output$saved <- renderTable({ # Display local calibrations table
         send_table$saved
       })
-    } else {
-      shinyalert::shinyalert(title = "Validate your measurements first!", type = "error", timer = 2000)
     }
   }, ignoreInit = TRUE)
 
@@ -2335,10 +2136,54 @@ table.on("click", "tr", function() {
     complete$pH <- FALSE
   }, ignoreInit = TRUE)
 
-  ### Save/Delete temperature ##############################################################################
+  ### Validate/Save/Delete temperature ##############################################################################
   observeEvent(input$save_cal_temp, {
-    if (validation_check$temp) {
+    validation_check$temp <- FALSE
+      tryCatch({
+        temp_re_type <- input$temp_reference_desc
+        temp_ref <- input$temp_reference
+        temp_meas <- input$temp_observed
+        temp_diff <- abs(temp_ref - temp_meas)
+        message <- character(0)
+        if (temp_diff > 0.2) {
+          shinyjs::js$backgroundCol("temp_observed", "red")
+          shinyjs::js$backgroundCol("temp_reference", "red")
+          message <- "Temperature difference is > 0.2 degrees C!"
+        } else if (temp_diff > 0.1) {
+          shinyjs::js$backgroundCol("temp_observed", "lemonchiffon")
+          shinyjs::js$backgroundCol("temp_reference", "lemonchiffon")
+          message <- "Temperature difference is > 0.1 degrees C!"
+        } else {
+          shinyjs::js$backgroundCol("temp_observed", "white")
+          shinyjs::js$backgroundCol("temp_reference", "white")
+        }
+        if (nchar(message) > 0) {
+          # Show a modal to the user to confirm that they are sure about their entries
+          showModal(modalDialog(
+            title = "Are you sure?",
+            message,
+            footer = tagList(
+              actionButton("ok_check_temp", "Yes, I'm sure"),
+              modalButton("Cancel")
+            )
+          ))
+        } else {
+          validation_check$temp <- TRUE
+        }
+      }, error = function(e) {
+        shinyalert::shinyalert(title = "You have unfilled mandatory entries", type = "error", timer = 2000)
+      })
+  }, ignoreInit = TRUE)
 
+  observeEvent(input$ok_check_temp, {
+    removeModal()
+    validation_check$temp <- TRUE
+  }, ignoreInit = TRUE)
+
+  observeEvent(validation_check$temp, {
+    if (!validation_check$temp) {
+      return()
+    } else {
       calibration_data$temp <- data.frame(calibration_id = calibration_data$next_id,
                                           temp_reference_desc = input$temp_reference_desc,
                                           temp_reference = input$temp_reference,
@@ -2366,8 +2211,6 @@ table.on("click", "tr", function() {
       output$saved <- renderTable({ # Display local calibrations table
         send_table$saved
       })
-    } else {
-      shinyalert::shinyalert(title = "Validate your measurements first!", type = "error", timer = 2000)
     }
   }, ignoreInit = TRUE)
 
@@ -2397,10 +2240,50 @@ table.on("click", "tr", function() {
   }, ignoreInit = TRUE)
 
 
-  ### Save/Delete ORP ##############################################################################
+  ## Validate/Save/Delete ORP ##############################################################################
   observeEvent(input$save_cal_orp, {
-    if (validation_check$orp) {
+    validation_check$orp <- FALSE
+      tryCatch({
+        orp_std <- input$orp_std
+        orp_post <- input$orp_post_mV
+        orp_diff <- abs(orp_std - orp_post)
+        if (orp_diff > 10) {
+          shinyjs::js$backgroundCol("orp_std", "red")
+          shinyjs::js$backgroundCol("orp_post_mV", "red")
+        } else if (orp_diff > 5) {
+          shinyjs::js$backgroundCol("orp_std", "lemonchiffon")
+          shinyjs::js$backgroundCol("orp_post_mV", "lemonchiffon")
+        } else {
+          shinyjs::js$backgroundCol("orp_std", "white")
+          shinyjs::js$backgroundCol("orp_post_mV", "white")
+        }
+        if (orp_diff > 5) {
+          # Show a modal to the user to confirm that they are sure about their entries
+          showModal(modalDialog(
+            title = "Are you sure?",
+            "ORP difference is > 5 mV; are you sure about your entries?",
+            footer = tagList(
+              actionButton("ok_check_orp", "Yes, I'm sure"),
+              modalButton("Cancel")
+            )
+          ))
+        } else {
+          validation_check$orp <- TRUE
+        }
+      }, error = function(e) {
+        shinyalert::shinyalert(title = "You have unfilled mandatory entries", type = "error", timer = 2000)
+      })
+  }, ignoreInit = TRUE)
 
+  observeEvent(input$ok_check_orp, {
+    removeModal()
+    validation_check$orp <- TRUE
+  }, ignoreInit = TRUE)
+
+observeEvent(validation_check$orp, {
+    if (!validation_check$orp) {
+      return()
+    } else {
       calibration_data$orp <- data.frame(calibration_id = calibration_data$next_id,
                                          orp_std = input$orp_std,
                                          orp_pre_mv = input$orp_pre_mV,
@@ -2428,10 +2311,9 @@ table.on("click", "tr", function() {
       output$saved <- renderTable({ # Display local calibrations table
         send_table$saved
       })
-    } else {
-      shinyalert::shinyalert(title = "Validate your measurements first!", type = "error", timer = 2000)
     }
   }, ignoreInit = TRUE)
+
   observeEvent(input$delete_orp, {
     shinyalert::shinyalert("Deleting...", type = "info")
     DBI::dbExecute(pool, paste0("DELETE FROM calibrate_orp WHERE calibration_id = ", calibration_data$next_id))
@@ -2458,53 +2340,132 @@ table.on("click", "tr", function() {
   }, ignoreInit = TRUE)
 
 
-  ### Save/Delete SpC ##############################################################################
+  ## Validate/Save/Delete SpC ##############################################################################
   observeEvent(input$save_cal_SpC, {
+    validation_check$SpC <- FALSE
     if (input$spc_or_not & is.null(calibration_data$temp)) {
       shinyalert::shinyalert("Calibrate temperature first!", "You must calibrate temperature first if entering non-specific conductivity")
       updateSelectizeInput(session, "selection", selected = "Temperature calibration")
       return()
     } else {
-      if (validation_check$SpC) {
-
-        calibration_data$SpC <- data.frame(calibration_id = calibration_data$next_id,
-                                           spc1_std = input$SpC1_std,
-                                           spc1_pre = if (input$spc_or_not) input$SpC1_pre/(1 + 0.02*(calibration_data$temp$temp_reference - 25)) else input$SpC1_pre,
-                                           spc1_post = if (input$spc_or_not) input$SpC1_post/(1 + 0.02*(calibration_data$temp$temp_reference - 25)) else input$SpC1_post,
-                                           spc2_std = input$SpC2_std,
-                                           spc2_pre = if (input$spc_or_not) input$SpC2_pre/(1 + 0.02*(calibration_data$temp$temp_reference - 25)) else input$SpC2_pre,
-                                           spc2_post = if (input$spc_or_not) input$SpC2_post/(1 + 0.02*(calibration_data$temp$temp_reference - 25)) else input$SpC2_post)
-        if (!complete$SpC) {
-          DBI::dbAppendTable(pool, "calibrate_specific_conductance", calibration_data$SpC)
-          complete$SpC <- TRUE
-          shinyjs::show("delete_SpC")
+      tryCatch({
+        SpC1_ref <- input$SpC1_std
+        SpC2_ref <- input$SpC2_std
+        SpC1_post <- if (input$spc_or_not) input$SpC1_post/(1 + 0.02*(calibration_data$temp$temp_reference - 25)) else input$SpC1_post
+        SpC2_post <- if (input$spc_or_not) input$SpC2_post/(1 + 0.02*(calibration_data$temp$temp_reference - 25)) else input$SpC2_post
+        SpC1_diff <- abs(SpC1_ref - SpC1_post)
+        SpC2_diff <- abs(SpC2_ref - SpC2_post)
+        message1 <- character(0)
+        message2 <- character(0)
+        if (SpC1_diff > 10) {
+          shinyjs::js$backgroundCol("SpC1_std", "red")
+          shinyjs::js$backgroundCol("SpC1_post", "red")
+          if (input$spc_or_not) {
+            message1 <- paste0("Double check your values: your low-range input converts to an SpC of ", round(SpC1_post, 0), " versus the expected ", SpC1_ref)
+          } else {
+            message1 <- "Warning: double check your low-range values"
+          }
+        } else if (SpC1_diff > 5) {
+          shinyjs::js$backgroundCol("SpC1_std", "lemonchiffon")
+          shinyjs::js$backgroundCol("SpC1_post", "lemonchiffon")
+          if (input$spc_or_not) {
+            message1 <- paste0("Double check your values: your low-range input converts to an SpC of ", round(SpC1_post, 0), " versus the expected ", SpC1_ref)
+          } else {
+            message1 <- "Warning: double check your values"
+          }
         } else {
-          DBI::dbExecute(pool, paste0("UPDATE calibrate_specific_conductance SET spc1_std = ", input$SpC1_std,
-                                      " spc1_pre = ", if (input$spc_or_not) input$SpC1_pre/(1 + 0.02*(calibration_data$temp$temp_reference - 25)) else input$SpC1_pre,
-                                      " spc1_post = ", if (input$spc_or_not) input$SpC1_post/(1 + 0.02*(calibration_data$temp$temp_reference - 25)) else input$SpC1_post,
-                                      " spc2_std = ", input$SpC2_std,
-                                      " spc2_pre = ", if (input$spc_or_not) input$SpC2_pre/(1 + 0.02*(calibration_data$temp$temp_reference - 25)) else input$SpC2_pre,
-                                      " spc2_post = ", if (input$spc_or_not) input$SpC2_post/(1 + 0.02*(calibration_data$temp$temp_reference - 25)) else input$SpC2_post,
-                                      " WHERE calibration_id = ", calibration_data$next_id))
+          shinyjs::js$backgroundCol("SpC1_std", "white")
+          shinyjs::js$backgroundCol("SpC1_post", "white")
         }
-        if ("Conductivity calibration" %in% send_table$saved[ ,1] | "Conductivity calibration" %in% send_table$restarted_cal[ ,1]) {
-          shinyalert::shinyalert(title = "Conductivity calibration overwritten", type = "success", timer = 2000, immediate = TRUE)
+        if (SpC2_diff > 10) {
+          shinyjs::js$backgroundCol("SpC2_std", "red")
+          shinyjs::js$backgroundCol("SpC2_post", "red")
+          if (input$spc_or_not) {
+            message1 <- paste0("Double check your values: your high-range input converts to an SpC of ", round(SpC2_post, 0), " versus the expected ", SpC2_ref)
+          } else {
+            message1 <- "Warning: double check your high-range values"
+          }
+        } else if (SpC2_diff > 5) {
+          shinyjs::js$backgroundCol("SpC2_std", "lemonchiffon")
+          shinyjs::js$backgroundCol("SpC2_post", "lemonchiffon")
+          shinyalert::shinyalert(title = "Warning: double check your values", type = "warning", timer = 2000)
+          if (input$spc_or_not) {
+            message1 <- paste0("Double check your values: your high-range input converts to an SpC of ", round(SpC2_post, 0), " versus the expected ", SpC2_ref)
+          } else {
+            message1 <- "Warning: double check your high-range values"
+          }
         } else {
-          shinyalert::shinyalert(title = "Conductivity calibration saved", type = "success", timer = 2000, immediate = TRUE)
+          shinyjs::js$backgroundCol("SpC2_std", "white")
+          shinyjs::js$backgroundCol("SpC2_post", "white")
         }
-        if (send_table$saved[1,1] == "Nothing saved yet") {
-          send_table$saved[1,1] <- "Conductivity calibration"
-        } else if (!("Conductivity calibration" %in% send_table$saved[ ,1])) {
-          send_table$saved[nrow(send_table$saved) + 1, 1] <- "Conductivity calibration"
+        if (SpC1_diff > 5 | SpC2_diff > 5) {
+          # Show a modal to the user to confirm that they are sure about their entries
+          message <- paste0(
+            if (nchar(message1) > 0) paste0(message1,  "<br><br>") else "",
+            message2
+          )
+          showModal(modalDialog(
+            title = "Are you sure?",
+            message,
+            footer = tagList(
+              actionButton("ok_check_SpC", "Yes, I'm sure"),
+              modalButton("Cancel")
+            )
+          ))
+        } else {
+          validation_check$SpC <- TRUE
         }
-        output$saved <- renderTable({ # Display local calibrations table
-          send_table$saved
-        })
-      } else {
-        shinyalert::shinyalert(title = "Validate your measurements first!", type = "error", timer = 2000)
-      }
+      }, error = function(e) {
+        shinyalert::shinyalert(title = "You have unfilled mandatory entries", type = "error", timer = 2000)
+      })
     }
   }, ignoreInit = TRUE)
+
+  observeEvent(input$ok_check_SpC, {
+    removeModal()
+    validation_check$SpC <- TRUE
+  }, ignoreInit = TRUE)
+
+  observeEvent(validation_check$SpC, {
+    if (!validation_check$SpC) {
+      return()
+    } else {
+      calibration_data$SpC <- data.frame(calibration_id = calibration_data$next_id,
+                                         spc1_std = input$SpC1_std,
+                                         spc1_pre = if (input$spc_or_not) input$SpC1_pre/(1 + 0.02*(calibration_data$temp$temp_reference - 25)) else input$SpC1_pre,
+                                         spc1_post = if (input$spc_or_not) input$SpC1_post/(1 + 0.02*(calibration_data$temp$temp_reference - 25)) else input$SpC1_post,
+                                         spc2_std = input$SpC2_std,
+                                         spc2_pre = if (input$spc_or_not) input$SpC2_pre/(1 + 0.02*(calibration_data$temp$temp_reference - 25)) else input$SpC2_pre,
+                                         spc2_post = if (input$spc_or_not) input$SpC2_post/(1 + 0.02*(calibration_data$temp$temp_reference - 25)) else input$SpC2_post)
+      if (!complete$SpC) {
+        DBI::dbAppendTable(pool, "calibrate_specific_conductance", calibration_data$SpC)
+        complete$SpC <- TRUE
+        shinyjs::show("delete_SpC")
+      } else {
+        DBI::dbExecute(pool, paste0("UPDATE calibrate_specific_conductance SET spc1_std = ", input$SpC1_std,
+                                    " spc1_pre = ", if (input$spc_or_not) input$SpC1_pre/(1 + 0.02*(calibration_data$temp$temp_reference - 25)) else input$SpC1_pre,
+                                    " spc1_post = ", if (input$spc_or_not) input$SpC1_post/(1 + 0.02*(calibration_data$temp$temp_reference - 25)) else input$SpC1_post,
+                                    " spc2_std = ", input$SpC2_std,
+                                    " spc2_pre = ", if (input$spc_or_not) input$SpC2_pre/(1 + 0.02*(calibration_data$temp$temp_reference - 25)) else input$SpC2_pre,
+                                    " spc2_post = ", if (input$spc_or_not) input$SpC2_post/(1 + 0.02*(calibration_data$temp$temp_reference - 25)) else input$SpC2_post,
+                                    " WHERE calibration_id = ", calibration_data$next_id))
+      }
+      if ("Conductivity calibration" %in% send_table$saved[ ,1] | "Conductivity calibration" %in% send_table$restarted_cal[ ,1]) {
+        shinyalert::shinyalert(title = "Conductivity calibration overwritten", type = "success", timer = 2000, immediate = TRUE)
+      } else {
+        shinyalert::shinyalert(title = "Conductivity calibration saved", type = "success", timer = 2000, immediate = TRUE)
+      }
+      if (send_table$saved[1,1] == "Nothing saved yet") {
+        send_table$saved[1,1] <- "Conductivity calibration"
+      } else if (!("Conductivity calibration" %in% send_table$saved[ ,1])) {
+        send_table$saved[nrow(send_table$saved) + 1, 1] <- "Conductivity calibration"
+      }
+      output$saved <- renderTable({ # Display local calibrations table
+        send_table$saved
+      })
+    }
+  }, ignoreInit = TRUE)
+
   observeEvent(input$delete_SpC, {
     shinyalert::shinyalert("Deleting...", type = "info")
     DBI::dbExecute(pool, paste0("DELETE FROM calibrate_specific_conductance WHERE calibration_id = ", calibration_data$next_id))
@@ -2532,8 +2493,65 @@ table.on("click", "tr", function() {
 
   ### Save/Delete turbidity ##############################################################################
   observeEvent(input$save_cal_turb, {
-    if (validation_check$turb) {
+    validation_check$turb <- FALSE
+    tryCatch({
+      turb1_ref <- input$turb1_std
+      turb2_ref <- input$turb2_std
+      turb1_post <- input$turb1_post
+      turb2_post <- input$turb2_post
+      turb1_diff <- abs(turb1_ref - turb1_post)
+      turb2_diff <- abs(turb2_ref - turb2_post)
+      gtg1 <- FALSE
+      gtg2 <- FALSE
+      if (turb1_diff > 10) {
+        shinyjs::js$backgroundCol("turb1_std", "red")
+        shinyjs::js$backgroundCol("turb1_post", "red")
+      } else if (turb1_diff > 5) {
+        shinyjs::js$backgroundCol("turb1_std", "lemonchiffon")
+        shinyjs::js$backgroundCol("turb1_post", "lemonchiffon")
+      } else {
+        shinyjs::js$backgroundCol("turb1_std", "white")
+        shinyjs::js$backgroundCol("turb1_post", "white")
+        gtg1 <- TRUE
+      }
+      if (turb2_diff > 10) {
+        shinyjs::js$backgroundCol("turb2_std", "red")
+        shinyjs::js$backgroundCol("turb2_post", "red")
+      } else if (turb2_diff > 5) {
+        shinyjs::js$backgroundCol("turb2_std", "lemonchiffon")
+        shinyjs::js$backgroundCol("turb2_post", "lemonchiffon")
+      } else {
+        shinyjs::js$backgroundCol("turb2_std", "white")
+        shinyjs::js$backgroundCol("turb2_post", "white")
+        gtg2 <- TRUE
+      }
+      if (!gtg1 | !gtg2) {
+        # Show a modal to the user to confirm that they are sure about their entries
+        showModal(modalDialog(
+          title = "Are you sure?",
+          "Your post-cal values are a bit off from the standard. Please check you entries before moving on.",
+          footer = tagList(
+            actionButton("ok_check_turb", "Yes, I'm sure"),
+            modalButton("Cancel")
+          )
+        ))
+      } else {
+        validation_check$turb <- TRUE
+      }
+    }, error = function(e) {
+      shinyalert::shinyalert(title = "You have unfilled mandatory entries", type = "error", timer = 2000)
+    })
+  }, ignoreInit = TRUE)
 
+  observeEvent(input$ok_check_turb, {
+    removeModal()
+    validation_check$turb <- TRUE
+  })
+
+  observeEvent(validation_check$turb, {
+    if (!validation_check$turb) {
+      return()
+    } else {
       calibration_data$turb <- data.frame(calibration_id = calibration_data$next_id,
                                           turb1_std = input$turb1_std,
                                           turb1_pre = input$turb1_pre,
@@ -2567,10 +2585,9 @@ table.on("click", "tr", function() {
       output$saved <- renderTable({ # Display local calibrations table
         send_table$saved
       })
-    } else {
-      shinyalert::shinyalert(title = "Validate your measurements first!", type = "error", timer = 2000)
     }
   }, ignoreInit = TRUE)
+
   observeEvent(input$delete_turb, {
     shinyalert::shinyalert("Deleting...", type = "info")
     DBI::dbExecute(pool, paste0("DELETE FROM calibrate_turbidity WHERE calibration_id = ", calibration_data$next_id))
@@ -2596,9 +2613,51 @@ table.on("click", "tr", function() {
     complete$turbidity <- FALSE
   }, ignoreInit = TRUE)
 
-  ### Save/Delete DO ##############################################################################
+  ## Validate/Save/Delete DO ##############################################################################
   observeEvent(input$save_cal_DO, {
-    if (validation_check$DO) {
+    validation_check$DO <- FALSE
+    tryCatch({
+      baro_post <- input$baro_press_post
+      DO_post <- input$DO_post
+      message1 <- character(0)
+      message2 <- character(0)
+      if (baro_post < 600 | baro_post > 800) {
+        message1 <- "Baro pressures are not in range, are you sure?"
+      }
+      if (DO_post < 1 | DO_post > 15) {
+        message2 <- "DO values are not in range, are you sure you entered % and mg/l in the right boxes? Only mg/l is saved, use the Fill/recalculate button."
+      }
+      if (nchar(message1) > 0 | nchar(message2) > 0) {
+        # Show a modal to the user to confirm that they are sure about their entries
+        message <- paste0(
+          if (nchar(message1) > 0) paste0(message1,  "<br><br>") else "",
+          message2
+        )
+        showModal(modalDialog(
+          title = "Are you sure?",
+          message,
+          footer = tagList(
+            actionButton("ok_check_DO", "Yes, I'm sure"),
+            modalButton("Cancel")
+          )
+        ))
+      } else {
+        validation_check$DO <- TRUE
+      }
+    }, error = function(e) {
+      shinyalert::shinyalert(title = "You have unfilled mandatory entries", "Baro pressure and DO in mg/l are mandatory", type = "error", timer = 4000)
+    })
+  }, ignoreInit = TRUE)
+
+  observeEvent(input$ok_check_DO, {
+    removeModal()
+    validation_check$DO <- TRUE
+  })
+
+  observeEvent(validation_check$DO, {
+    if (!validation_check$DO) {
+      return()
+    } else {
       calibration_data$DO <- data.frame(calibration_id = calibration_data$next_id,
                                         baro_press_pre = input$baro_press_pre,
                                         baro_press_post = input$baro_press_post,
@@ -2629,10 +2688,9 @@ table.on("click", "tr", function() {
       output$saved <- renderTable({ # Display local calibrations table
         send_table$saved
       })
-    } else {
-      shinyalert::shinyalert(title = "Validate your measurements first!", type = "error", timer = 2000)
     }
   }, ignoreInit = TRUE)
+
   observeEvent(input$delete_DO, {
     shinyalert::shinyalert("Deleting...", type = "info")
     DBI::dbExecute(pool, paste0("DELETE FROM calibrate_dissolved_oxygen WHERE calibration_id = ", calibration_data$next_id))
@@ -2658,10 +2716,39 @@ table.on("click", "tr", function() {
     complete$DO <- FALSE
   }, ignoreInit = TRUE)
 
-  ### Save/Delete depth ##############################################################################
+  ## Validate/Save/Delete depth ##############################################################################
   observeEvent(input$save_cal_depth, {
-    if (validation_check$depth) {
+    validation_check$depth <- FALSE
+      tryCatch({
+        depth_check <- input$depth_check_ok
+        depth_change <- input$depth_changes_ok
+        if (depth_check == "TRUE" & depth_change == "TRUE") {
+          validation_check$depth <- TRUE
+        } else {
+          # Show a modal to the user to confirm that they are sure about their entries
+          showModal(modalDialog(
+            title = "Are you sure?",
+            "You indicated FALSE or 'Not Checked' for one of the values. Are you sure about that? Should you be using a different sensor?",
+            footer = tagList(
+              actionButton("ok_check_depth", "Yes, I'm sure"),
+              modalButton("Cancel")
+            )
+          ))
+        }
+      }, error = function(e) {
+        shinyalert::shinyalert(title = "You have unfilled mandatory entries", type = "error", timer = 2000)
+      })
+  }, ignoreInit = TRUE)
 
+  observeEvent(input$ok_check_depth, {
+    removeModal()
+    validation_check$depth <- TRUE
+  })
+
+observeEvent(validation_check$depth, {
+    if (!validation_check$depth) {
+      return()
+    } else {
       calibration_data$depth <- data.frame(calibration_id = calibration_data$next_id,
                                            depth_check_ok = input$depth_check_ok,
                                            depth_changes_ok = if (input$depth_changes_ok != "Not Checked") input$depth_changes_ok else NA)
@@ -2675,7 +2762,6 @@ table.on("click", "tr", function() {
         } else {
           DBI::dbExecute(pool, paste0("UPDATE calibrate_depth SET depth_check_ok = '", input$depth_check_ok, "', depth_changes_ok = NULL WHERE calibration_id = ", calibration_data$next_id))
         }
-
       }
       if ("Depth calibration" %in% send_table$saved[ ,1] | "Depth calibration" %in% send_table$restarted_cal[ ,1]) {
         shinyalert::shinyalert(title = "Depth calibration overwritten", type = "success", timer = 2000, immediate = TRUE)
@@ -2690,10 +2776,9 @@ table.on("click", "tr", function() {
       output$saved <- renderTable({ # Display local calibrations table
         send_table$saved
       })
-    } else {
-      shinyalert::shinyalert(title = "Validate your measurements first!", type = "error", timer = 2000)
     }
   }, ignoreInit = TRUE)
+
   observeEvent(input$delete_depth, {
     shinyalert::shinyalert("Deleting...", type = "info")
     DBI::dbExecute(pool, paste0("DELETE FROM calibrate_depth WHERE calibration_id = ", calibration_data$next_id))
@@ -2780,4 +2865,5 @@ table.on("click", "tr", function() {
       )
     }
   }, ignoreInit = TRUE)
+
 }

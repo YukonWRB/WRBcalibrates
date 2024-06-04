@@ -58,12 +58,11 @@ app_ui <- function(request) {
               conditionalPanel(
                 condition = "input.selection == 'Basic calibration info'",
                 uiOutput("observer"),
-                shinyWidgets::airDatepickerInput("obs_datetime", label = "Calibration date/time", value = .POSIXct(Sys.time(), tz = "MST"), range = FALSE, multiple = FALSE, timepicker = TRUE, maxDate = Sys.Date() + 1, startView = Sys.Date(), update_on = "close", timepickerOpts = shinyWidgets::timepickerOptions(minutesStep = 15, timeFormat = "HH:mm")),
+                shinyWidgets::airDatepickerInput("obs_datetime", label = "Calibration date/time (modify with the menu only)", value = .POSIXct(Sys.time(), tz = "MST"), range = FALSE, multiple = FALSE, timepicker = TRUE, maxDate = Sys.Date() + 1, startView = Sys.Date(), update_on = "change", timepickerOpts = shinyWidgets::timepickerOptions(minutesStep = 15, timeFormat = "HH:mm")),
                 textOutput("instrument_reminder"),
                 uiOutput("ID_sensor_holder"),
                 uiOutput("ID_handheld_meter"),
-                actionButton("save_basic_info", "Save this sheet"),
-                actionButton("submit_btn", "Finalize and submit calibration")
+                actionButton("save_basic_info", "Save this parameter info"),
               ),
               conditionalPanel(
                 condition = "input.selection == 'pH calibration'",
@@ -80,7 +79,6 @@ app_ui <- function(request) {
                 numericInput("pH1_post_val", label = "pH 4 Post-Cal Value", value = 4),
                 numericInput("pH2_post_val", label = "pH 7 Post-Cal Value", value = 7),
                 numericInput("pH3_post_val", label = "pH 10 Post-Cal Value", value = 10),
-                actionButton("validate_pH", "Validate measurements"),
                 actionButton("save_cal_pH", "Save this sheet"),
                 actionButton("delete_pH", "Delete this sheet")
               ),
@@ -89,7 +87,6 @@ app_ui <- function(request) {
                 textInput("temp_reference_desc", label = "Temp Reference Type", value = "Lab thermometer"),
                 numericInput("temp_reference", label = "Reference Temp", value = ""),
                 numericInput("temp_observed", label = "Sensor Temp", value = ""),
-                actionButton("validate_temp", "Validate measurements"),
                 actionButton("save_cal_temp", "Save this sheet"),
                 actionButton("delete_temp", "Delete this sheet")
               ),
@@ -103,7 +100,6 @@ app_ui <- function(request) {
                 actionButton("show_post_SpC", "Show post-cal fields"),
                 numericInput("SpC1_post", label = "SpC Low-Range Post-Cal Value", value = 0),
                 numericInput("SpC2_post", label = "SpC High-Range Post-Cal Value", value = 1413),
-                actionButton("validate_SpC", "Validate measurements"),
                 actionButton("save_cal_SpC", "Save this sheet"),
                 actionButton("delete_SpC", "Delete this sheet")
               ),
@@ -113,7 +109,6 @@ app_ui <- function(request) {
                 numericInput("orp_pre_mV", label = "ORP mV Pre-Cal Value", value = ""),
                 actionButton("show_post_orp", "Show post-cal fields"),
                 numericInput("orp_post_mV", label = "ORP mV Post-Cal Value", value = ""),
-                actionButton("validate_orp", "Validate measurements"),
                 actionButton("save_cal_orp", "Save this sheet"),
                 actionButton("delete_orp", "Delete this sheet")
               ),
@@ -126,7 +121,6 @@ app_ui <- function(request) {
                 actionButton("show_post_turb", "Show post-cal fields"),
                 numericInput("turb1_post", label = "Low Turb Post-cal Value", value = 0),
                 numericInput("turb2_post", label = "High Turb Post-cal Value", value = 124),
-                actionButton("validate_turb", "Validate measurements"),
                 actionButton("save_cal_turb", "Save this sheet"),
                 actionButton("delete_turb", "Delete this sheet")
               ),
@@ -140,7 +134,6 @@ app_ui <- function(request) {
                 actionButton("calc_prct_DO", "Calculate % values"),
                 numericInput("DO_pre", label = "DO Pre-Cal mg/l", value = ""),
                 numericInput("DO_post", label = "DO Post-Cal mg/l", value = ""),
-                actionButton("validate_DO", "Validate measurements"),
                 actionButton("save_cal_DO", "Save this sheet"),
                 actionButton("delete_DO", "Delete this sheet")
               ),
@@ -148,10 +141,10 @@ app_ui <- function(request) {
                 condition = "input.selection == 'Depth calibration'",
                 radioButtons(inputId = "depth_check_ok", label = "Depth sensor output near 0 or as expected in air?", choiceNames = c("FALSE", "TRUE"), choiceValues = c("FALSE", "TRUE")),
                 radioButtons(inputId = "depth_changes_ok", label = "Depth sensor output changes as expected with depth?", choiceNames = c("Not Checked", "FALSE", "TRUE"), choiceValues = c("Not Checked", "FALSE", "TRUE")),
-                actionButton("validate_depth", "Validate measurements"),
                 actionButton("save_cal_depth", "Save this sheet"),
                 actionButton("delete_depth", "Delete this sheet")
-              )
+              ),
+              actionButton("submit_btn", "Finalize + submit calibration", style = c("margin-top: 10px;"))
             ),
             mainPanel(
               DT::dataTableOutput("calibration_instruments_table"),
@@ -174,10 +167,10 @@ app_ui <- function(request) {
               selectizeInput("type", label = "Instrument type", choices = "placeholder"),
               textInput("instrument_owner", "Instrument owner", value = ""),
               checkboxInput("replaceableSensors", "Replaceable sensors?", value = FALSE),
-              textInput("asset_tag", "Asset tag number", value = ""),
-              dateInput("date_in_service", label = "Date in service"),
-              dateInput("date_purchased", label = "Date purchased"),
-              dateInput("date_retired", label = "Date retired"),
+              textInput("asset_tag", "Asset tag number (if exists)", value = ""),
+              dateInput("date_in_service", label = "Date in service (if known)"),
+              dateInput("date_purchased", label = "Date purchased (if known)"),
+              dateInput("date_retired", label = "Date retired (if known)"),
               uiOutput("retired_by"),
               actionButton("save_cal_instrument", "Save new instrument")
             ),
@@ -209,14 +202,14 @@ app_ui <- function(request) {
               selectizeInput("maintain_serial", "Select your instrument", choices = "loading choices..."),
               div(class = "load_sensors_btn", actionButton("load_sensors", "Show sensors")),
               div(class = "show_sensors_btns",
-                  actionButton("sensor1_show", "Slot 1"),
-                  actionButton("sensor2_show", "Slot 2"),
-                  actionButton("sensor3_show", "Slot 3"),
-                  actionButton("sensor4_show", "Slot 4"),
-                  actionButton("sensor5_show", "Slot 5"),
-                  actionButton("sensor6_show", "Slot 6"),
-                  actionButton("sensor7_show", "Slot 7"),
-                  actionButton("sensor8_show", "Slot 8")
+                  actionButton("sensor1_show", "Slot 1", style = c("margin-bottom: 5px;")),
+                  actionButton("sensor2_show", "Slot 2", style = c("margin-bottom: 5px;")),
+                  actionButton("sensor3_show", "Slot 3", style = c("margin-bottom: 5px;")),
+                  actionButton("sensor4_show", "Slot 4", style = c("margin-bottom: 5px;")),
+                  actionButton("sensor5_show", "Slot 5", style = c("margin-bottom: 5px;")),
+                  actionButton("sensor6_show", "Slot 6", style = c("margin-bottom: 5px;")),
+                  actionButton("sensor7_show", "Slot 7", style = c("margin-bottom: 5px;")),
+                  actionButton("sensor8_show", "Slot 8", style = c("margin-bottom: 5px;"))
               ),
               selectizeInput("add_sensor_type_dropdown", "ADD a slot w/ sensor (CHANGE assigned sensor to the right)", choices = "placeholder"),
               selectizeInput("new_sensor_serial", "Serial number (type your own if not in yet)", choices = NULL, options = list(create = TRUE)),
