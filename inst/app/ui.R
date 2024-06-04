@@ -166,9 +166,9 @@ app_ui <- function(request) {
           "Add/modify instruments",
           sidebarLayout(
             sidebarPanel(
-              selectizeInput("existing_serial_no", "Search serial numbers or 'New record' for a new instrument'", choices = "New record"),
+              selectizeInput("existing_serial_no", "Search serial numbers or 'New record' for a new instrument", choices = "New record"),
               textInput("serial_no", "New serial no (add alias by appending to serial #, e.g. 012345Blue)", value = "Search first!"),
-              renderUI("recorder"),
+              uiOutput("recorder"),
               selectizeInput("make", label = "Instrument make", choices = "placeholder"),
               selectizeInput("model", label = "Instrument model", choices = "placeholder"),
               selectizeInput("type", label = "Instrument type", choices = "placeholder"),
@@ -178,7 +178,7 @@ app_ui <- function(request) {
               dateInput("date_in_service", label = "Date in service"),
               dateInput("date_purchased", label = "Date purchased"),
               dateInput("date_retired", label = "Date retired"),
-              renderUI("retired_by"),
+              uiOutput("retired_by"),
               actionButton("save_cal_instrument", "Save new instrument")
             ),
             mainPanel(
@@ -188,8 +188,17 @@ app_ui <- function(request) {
         ),
         tabPanel(
           "Maintain instruments",
-          mainPanel(
-            textOutput("maintain_instrument_placeholder")
+          sidebarLayout(
+            sidebarPanel(
+              DT::dataTableOutput("maintain_instr_table")
+            ),
+            mainPanel(
+              DT::dataTableOutput("past_instr_maintenance"),
+              actionButton("clear_selection", "Clear selection"),
+              textAreaInput("maintain_comment", "Describe the new maintenance performed", "", height = "100px", width = "800px"),
+              uiOutput("maintain_recorder"),
+              actionButton("submit_instr_maintain", "Save new maintenance event")
+            )
           )
         ),
         tabPanel(

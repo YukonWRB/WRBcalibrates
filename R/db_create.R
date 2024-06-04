@@ -175,6 +175,7 @@ DBI::dbExecute(con, "CREATE TABLE observers (
   # Create "maintenance" tables ########################################
   DBI::dbExecute(con,
                  "CREATE TABLE instrument_maintenance (
+                  event_id SERIAL PRIMARY KEY,
                   instrument_id INTEGER NOT NULL,
                   observer INTEGER NOT NULL,
                   obs_datetime TIMESTAMP WITH TIME ZONE NOT NULL,
