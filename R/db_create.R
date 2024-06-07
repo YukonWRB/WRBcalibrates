@@ -64,8 +64,8 @@ OPTIONS (schema_name 'public', table_name 'locations');
                  type_id SERIAL PRIMARY KEY,
                  type TEXT NOT NULL,
                  description TEXT NOT NULL,
-                 create_datetime TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                 modify_datetime TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                 create_datetime TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+                 modify_datetime TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
                  )
                  ;")
 
@@ -73,8 +73,8 @@ DBI::dbExecute(con, "CREATE TABLE instrument_make (
                  make_id SERIAL PRIMARY KEY,
                  make TEXT NOT NULL,
                  description TEXT,
-                 create_datetime TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                 modify_datetime TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                 create_datetime TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+                 modify_datetime TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
                  )
                  ;")
 
@@ -82,8 +82,8 @@ DBI::dbExecute(con, "CREATE TABLE instrument_model (
                  model_id SERIAL PRIMARY KEY,
                  model TEXT NOT NULL,
                  description TEXT
-                 create_datetime TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                 modify_datetime TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                 create_datetime TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+                 modify_datetime TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
                  )
                  ;")
 
@@ -92,8 +92,8 @@ DBI::dbExecute(con, "CREATE TABLE observers (
                  observer_first TEXT NOT NULL,
                  observer_last TEXT NOT NULL
                  organization TEXT NOT NULL,
-                 create_datetime TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                 modify_datetime TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                 create_datetime TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+                 modify_datetime TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
                  UNIQUE (observer_first, observer_last, organization)
                  )
                  ;")
@@ -113,8 +113,8 @@ DBI::dbExecute(con, "CREATE TABLE observers (
                   date_purchased DATE,
                   retired_by TEXT,
                   date_retired DATE,
-                  create_datetime TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                  modify_datetime TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                  create_datetime TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+                  modify_datetime TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
                   UNIQUE (serial_no),
                   FOREIGN KEY (make) REFERENCES instrument_make(make_id) ON UPDATE CASCADE ON DELETE CASCADE,
                   FOREIGN KEY (model) REFERENCES instrument_model(model_id) ON UPDATE CASCADE ON DELETE CASCADE,
@@ -132,8 +132,8 @@ DBI::dbExecute(con, "CREATE TABLE observers (
                   deployment_purpose TEXT,
                   deployment_notes TEXT,
                   location_id INTEGER NOT NULL,
-                  create_datetime TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                  modify_datetime TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                  create_datetime TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+                  modify_datetime TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
                   FOREIGN KEY (instrument_id) REFERENCES instruments(instrument_id) ON UPDATE CASCADE ON DELETE CASCADE
                   )
                  ;")
@@ -164,8 +164,8 @@ DBI::dbExecute(con, "CREATE TABLE observers (
                   sensor_type_id SERIAL PRIMARY KEY,
                   sensor_type TEXT NOT NULL,
                   sensor_type_description TEXT,
-                  create_datetime TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                  modify_datetime TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                  create_datetime TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+                  modify_datetime TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
                  )")
   DBI::dbExecute(con,
                  "CREATE TABLE sensors (
@@ -181,8 +181,8 @@ DBI::dbExecute(con, "CREATE TABLE observers (
                   sensor_asset_tag TEXT,
                   sensor_notes TEXT,
                   UNIQUE (sensor_serial),
-                  create_datetime TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                  modify_datetime TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                  create_datetime TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+                  modify_datetime TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
                   FOREIGN KEY (sensor_type) REFERENCES sensor_types(sensor_type_id) ON UPDATE CASCADE ON DELETE CASCADE
                  )
                  ;")
@@ -196,8 +196,8 @@ DBI::dbExecute(con, "CREATE TABLE observers (
                   observer INTEGER NOT NULL,
                   obs_datetime TIMESTAMP WITH TIME ZONE NOT NULL,
                   note TEXT NOT NULL,
-                  create_datetime TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                  modify_datetime TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                  create_datetime TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+                  modify_datetime TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
                   FOREIGN KEY (instrument_id) REFERENCES instruments(instrument_id) ON UPDATE CASCADE ON DELETE CASCADE,
                   FOREIGN KEY (observer) REFERENCES observers(observer_id) ON UPDATE CASCADE ON DELETE CASCADE
                  )
@@ -225,8 +225,8 @@ DBI::dbExecute(con,
                 sensor7_notes TEXT,
                 sensor8_id INTEGER,
                 sensor8_notes TEXT,
-                create_datetime TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                modify_datetime TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                create_datetime TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+                modify_datetime TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
                 FOREIGN KEY (instrument_id) REFERENCES instruments(instrument_id) ON UPDATE CASCADE ON DELETE CASCADE,
                 FOREIGN KEY (observer) REFERENCES observers(observer_id) ON UPDATE CASCADE ON DELETE CASCADE,
                 FOREIGN KEY (sensor1_id) REFERENCES sensors(sensor_id) ON UPDATE CASCADE ON DELETE CASCADE,
@@ -252,8 +252,8 @@ DBI::dbExecute(con, "COMMENT ON TABLE array_maintenance_changes IS 'This table i
                   id_sensor_holder INTEGER NOT NULL,
                   id_handheld_meter INTEGER,
                   complete BOOLEAN NOT NULL DEFAULT FALSE,
-                  create_datetime TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                  modify_datetime TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                  create_datetime TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+                  modify_datetime TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
                   FOREIGN KEY (id_sensor_holder) REFERENCES instruments(instrument_id) ON UPDATE CASCADE ON DELETE CASCADE,
                   FOREIGN KEY (id_handheld_meter) REFERENCES instruments(instrument_id) ON UPDATE CASCADE ON DELETE CASCADE,
                   FOREIGN KEY (observer) REFERENCES observers(observer_id) ON UPDATE CASCADE ON DELETE CASCADE
@@ -266,8 +266,8 @@ DBI::dbExecute(con, "COMMENT ON TABLE array_maintenance_changes IS 'This table i
                   temp_reference_desc TEXT NOT NULL,
                   temp_reference NUMERIC NOT NULL,
                   temp_observed NUMERIC NOT NULL,
-                  create_datetime TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                  modify_datetime TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                  create_datetime TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+                  modify_datetime TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
                   PRIMARY KEY (calibration_id),
                   FOREIGN KEY (calibration_id) REFERENCES calibrations(calibration_id) ON UPDATE CASCADE ON DELETE CASCADE
                  )
@@ -282,8 +282,8 @@ DBI::dbExecute(con, "COMMENT ON TABLE array_maintenance_changes IS 'This table i
                   SpC2_pre NUMERIC NOT NULL,
                   SpC1_post NUMERIC NOT NULL,
                   SpC2_post NUMERIC NOT NULL,
-                  create_datetime TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                  modify_datetime TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                  create_datetime TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+                  modify_datetime TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
                   PRIMARY KEY (calibration_id),
                   FOREIGN KEY (calibration_id) REFERENCES calibrations(calibration_id) ON UPDATE CASCADE ON DELETE CASCADE
                  )
@@ -304,8 +304,8 @@ DBI::dbExecute(con, "COMMENT ON TABLE array_maintenance_changes IS 'This table i
                   pH1_post_val NUMERIC NOT NULL,
                   pH2_post_val NUMERIC NOT NULL,
                   pH3_post_val NUMERIC,
-                  create_datetime TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                  modify_datetime TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                  create_datetime TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+                  modify_datetime TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
                   PRIMARY KEY (calibration_id),
                   FOREIGN KEY (calibration_id) REFERENCES calibrations(calibration_id) ON UPDATE CASCADE ON DELETE CASCADE
                 )
@@ -317,8 +317,8 @@ DBI::dbExecute(con, "COMMENT ON TABLE array_maintenance_changes IS 'This table i
                   orp_std NUMERIC NOT NULL,
                   orp_pre_mV NUMERIC NOT NULL,
                   orp_post_mV NUMERIC NOT NULL,
-                  create_datetime TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                  modify_datetime TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                  create_datetime TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+                  modify_datetime TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
                   PRIMARY KEY (calibration_id),
                   FOREIGN KEY (calibration_id) REFERENCES calibrations(calibration_id) ON UPDATE CASCADE ON DELETE CASCADE
                  )
@@ -333,8 +333,8 @@ DBI::dbExecute(con, "COMMENT ON TABLE array_maintenance_changes IS 'This table i
                   turb2_pre NUMERIC NOT NULL,
                   turb1_post NUMERIC NOT NULL,
                   turb2_post NUMERIC NOT NULL,
-                  create_datetime TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                  modify_datetime TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                  create_datetime TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+                  modify_datetime TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
                   PRIMARY KEY (calibration_id),
                   FOREIGN KEY (calibration_id) REFERENCES calibrations(calibration_id) ON UPDATE CASCADE ON DELETE CASCADE
                  )
@@ -347,8 +347,8 @@ DBI::dbExecute(con, "COMMENT ON TABLE array_maintenance_changes IS 'This table i
                   baro_press_post NUMERIC NOT NULL,
                   DO_pre_mgl NUMERIC NOT NULL,
                   DO_post_mgl NUMERIC NOT NULL,
-                  create_datetime TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                  modify_datetime TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                  create_datetime TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+                  modify_datetime TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
                   PRIMARY KEY (calibration_id),
                   FOREIGN KEY (calibration_id) REFERENCES calibrations(calibration_id) ON UPDATE CASCADE ON DELETE CASCADE
                  )
@@ -359,8 +359,8 @@ DBI::dbExecute(con, "COMMENT ON TABLE array_maintenance_changes IS 'This table i
                   calibration_id INTEGER NOT NULL,
                   depth_check_ok BOOLEAN NOT NULL,
                   depth_changes_ok BOOLEAN,
-                  create_datetime TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                  modify_datetime TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                  create_datetime TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+                  modify_datetime TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
                   PRIMARY KEY (calibration_id),
                   FOREIGN KEY (calibration_id) REFERENCES calibrations(calibration_id) ON UPDATE CASCADE ON DELETE CASCADE
                  )

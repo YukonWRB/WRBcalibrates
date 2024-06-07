@@ -1139,6 +1139,11 @@ table.on("click", "tr", function() {
               shinyjs::hide("add_sensor_type_dropdown")
             }
           }
+        } else {
+          shinyjs::show("add_sensor")
+          shinyjs::show("new_sensor_serial")
+          shinyjs::show("add_sensor_note")
+          shinyjs::show("add_sensor_name")
         }
       }
     }
@@ -1188,8 +1193,8 @@ table.on("click", "tr", function() {
         selectizeInput("new_sensor_make", "Make (type your own if not in yet)", choices = unique(sensors_data$sensors$sensor_make), options = list(create = TRUE)),
         selectizeInput("new_sensor_model", "Model (type your own if not in yet)", choices = unique(sensors_data$sensors$sensor_model), options = list(create = TRUE)),
         textInput("new_sensor_asset_tag", "Asset tag (optional)"),
-        dateInput("new_sensor_date_purchased", "Date purchased"),
-        dateInput("new_sensor_date_in_service", "Date in service", value = Sys.Date()),
+        dateInput("new_sensor_date_purchased", "Date purchased (if known)"),
+        dateInput("new_sensor_date_in_service", "Date in service (if known)", value = Sys.Date()),
         textAreaInput("new_sensor_notes", "Notes (optional)"),
         actionButton("add_sensor_to_db", "Add sensor")
       ))
@@ -1220,10 +1225,10 @@ table.on("click", "tr", function() {
                       "sensor_serial" = input$new_sensor_serial,
                       "sensor_make" = input$new_sensor_make,
                       "sensor_model" = input$new_sensor_model,
-                      "sensor_asset_tag" = input$new_sensor_asset_tag,
-                      "sensor_date_purchased" = input$new_sensor_date_purchased,
-                      "sensor_date_in_service" = input$new_sensor_date_in_service,
-                      "sensor_notes" = input$new_sensor_notes)
+                      "sensor_asset_tag" = if (nchar(input$new_sensor_asset_tag) > 0) input$new_sensor_asset_tag else NA,
+                      "sensor_date_purchased" = if (length(input$new_sensor_date_purchased) > 0) input$new_sensor_date_purchased else NA,
+                      "sensor_date_in_service" = if (length(input$new_sensor_date_in_service) > 0) input$new_sensor_date_in_service else NA,
+                      "sensor_notes" = if (nchar(input$new_sensor_notes) > 0) input$new_sensor_notes else NA)
     DBI::dbAppendTable(pool, "sensors", tbl)
 
     removeModal()
@@ -1243,10 +1248,10 @@ table.on("click", "tr", function() {
                       "sensor_serial" = input$add_sensor_serial,
                       "sensor_make" = input$new_sensor_make,
                       "sensor_model" = input$new_sensor_model,
-                      "sensor_asset_tag" = input$new_sensor_asset_tag,
-                      "sensor_date_purchased" = input$new_sensor_date_purchased,
-                      "sensor_date_in_service" = input$new_sensor_date_in_service,
-                      "sensor_notes" = input$new_sensor_notes)
+                      "sensor_asset_tag" = if (nchar(input$new_sensor_asset_tag) > 0) input$new_sensor_asset_tag else NA,
+                      "sensor_date_purchased" = if (length(input$new_sensor_date_purchased) > 0) input$new_sensor_date_purchased else NA,
+                      "sensor_date_in_service" = if (length(input$new_sensor_date_in_service) > 0) input$new_sensor_date_in_service else NA,
+                      "sensor_notes" = if (nchar(input$new_sensor_notes) > 0) input$new_sensor_notes else NA)
     DBI::dbAppendTable(pool, "sensors", tbl)
 
     removeModal()
@@ -1260,10 +1265,14 @@ table.on("click", "tr", function() {
   ## Add a sensor to a new slot, or modify a sensor added in this same session ############################
   observeEvent(input$add_sensor, {
     #find out if an entry already has the timestamp sensors_data$datetime for this same instrument (sensors_data$instrument is already subset to the instrument_id)
-    sensors_data$datetime_exists <- if (max(sensors_data$instrument$obs_datetime) == sensors_data$datetime) TRUE else FALSE
+    if (length(sensors_data$instrument$obs_datetime) == 0) {
+      sensors_data$datetime_exists <- FALSE
+    } else {
+      sensors_data$datetime_exists <- if (max(sensors_data$instrument$obs_datetime) == sensors_data$datetime) TRUE else FALSE
+
+    }
 
     sensor_id <- sensors_data$sensors[sensors_data$sensors$sensor_serial == input$new_sensor_serial, "sensor_id"]
-
     type_id <- sensors_data$sensors[sensors_data$sensors$sensor_id == sensor_id, "sensor_type"]
     type <- sensors_data$sensor_types[sensors_data$sensor_types$sensor_type_id == type_id, "sensor_type"]
 
@@ -1276,7 +1285,11 @@ table.on("click", "tr", function() {
       DBI::dbExecute(pool, paste0("UPDATE array_maintenance_changes SET ", col_id, " = ", sensor_id, ", ", col_comment, " = '", comment, "', WHERE obs_datetime = '", sensors_data$datetime, "' AND instrument_id = ", sensors_data$instrument_id, ";"))
     } else { # Creating a new entry, starting out with the last entry in the array_maintenance_changes table so that sensor changes are noted
       # Take the final row of the array_maintenance_changes table and replace fields
-      df <- sensors_data$instrument[nrow(sensors_data$instrument), ]
+      if (nrow(sensors_data$instrument) == 0) { # Nothing to go off of, so make a new df to append
+        df <- data.frame(instrument_id = sensors_data$instrument_id)
+      } else {
+        df <- sensors_data$instrument[nrow(sensors_data$instrument), ]
+      }
       df$event_id <- NULL
       df$obs_datetime <- sensors_data$datetime
       df$observer <- input$add_sensor_name
@@ -1291,8 +1304,8 @@ table.on("click", "tr", function() {
     # Increment the number of sensors
     sensors_data$number <- sensors_data$number + 1
 
-    shinyjs::show(paste0("sensor", sensors_data$number + 1, "_show")) # show the new sensor button
-    shinyjs::removeClass(paste0("sensor", sensors_data$number + 1, "_show"), "hidden")
+    shinyjs::show(paste0("sensor", sensors_data$number, "_show")) # show the new sensor button
+    shinyjs::removeClass(paste0("sensor", sensors_data$number, "_show"), "hidden")
     shinyjs::hide("add_sensor_name")
     shinyjs::hide("add_sensor")
     shinyjs::hide("new_sensor_serial")
@@ -1717,7 +1730,7 @@ table.on("click", "tr", function() {
           selectizeInput("ID_handheld_meter", label = "Handheld serial # (if applicable)", choices = c("NA", instruments_data$handhelds$serial_no),
                          selected =
                            if (!is.na(calibrations$incomplete_calibrations[calibrations$incomplete_calibrations$calibration_id == incomplete_ID , "id_handheld_meter"]))
-                             instruments_data$others[instruments_data$others$instrument_id == calibrations$incomplete_calibrations[calibrations$incomplete_calibrations$calibration_id == incomplete_ID, "id_handheld_meter"], "serial_no"]
+                             instruments_data$handhelds[instruments_data$handhelds$instrument_id == calibrations$incomplete_calibrations[calibrations$incomplete_calibrations$calibration_id == incomplete_ID, "id_handheld_meter"], "serial_no"]
                          else "NA"),
           style = "color: white; background-color: green;"
         )
@@ -2140,7 +2153,6 @@ observeEvent(validation_check$pH, {
   observeEvent(input$save_cal_temp, {
     validation_check$temp <- FALSE
       tryCatch({
-        temp_re_type <- input$temp_reference_desc
         temp_ref <- input$temp_reference
         temp_meas <- input$temp_observed
         temp_diff <- abs(temp_ref - temp_meas)
@@ -2157,7 +2169,7 @@ observeEvent(validation_check$pH, {
           shinyjs::js$backgroundCol("temp_observed", "white")
           shinyjs::js$backgroundCol("temp_reference", "white")
         }
-        if (nchar(message) > 0) {
+        if (length(message) > 0) {
           # Show a modal to the user to confirm that they are sure about their entries
           showModal(modalDialog(
             title = "Are you sure?",
@@ -2401,7 +2413,7 @@ observeEvent(validation_check$orp, {
         if (SpC1_diff > 5 | SpC2_diff > 5) {
           # Show a modal to the user to confirm that they are sure about their entries
           message <- paste0(
-            if (nchar(message1) > 0) paste0(message1,  "<br><br>") else "",
+            if (length(message1) > 0) paste0(message1,  "<br><br>") else "",
             message2
           )
           showModal(modalDialog(
@@ -2627,10 +2639,10 @@ observeEvent(validation_check$orp, {
       if (DO_post < 1 | DO_post > 15) {
         message2 <- "DO values are not in range, are you sure you entered % and mg/l in the right boxes? Only mg/l is saved, use the Fill/recalculate button."
       }
-      if (nchar(message1) > 0 | nchar(message2) > 0) {
+      if (length(message1) > 0 | length(message2) > 0) {
         # Show a modal to the user to confirm that they are sure about their entries
         message <- paste0(
-          if (nchar(message1) > 0) paste0(message1,  "<br><br>") else "",
+          if (length(message1) > 0) paste0(message1,  "<br><br>") else "",
           message2
         )
         showModal(modalDialog(
