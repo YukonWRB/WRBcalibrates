@@ -1514,7 +1514,6 @@ table.on("click", "tr", function() {
         shinyalert::shinyalert("Unfilled mandatory entries!", text = "You need to provide your name, instrument make, model, type, and serial number of minimum 2 characters.", type = "error")
         new_entry <- FALSE
       } else { #Make a new entry
-
         instrument.df <- data.frame(observer = input$recorder,
                                     obs_datetime = as.character(.POSIXct(Sys.time(), tz = "UTC")),
                                     make = input$make,
@@ -1529,45 +1528,38 @@ table.on("click", "tr", function() {
                                     retired_by = input$retired_by,
                                     date_retired = if (length(input$date_retired) < 1) NA else as.character(input$date_retired))
         DBI::dbAppendTable(pool, "instruments", instrument.df)
-        instrument.df$instrument_id <- DBI::dbGetQuery(pool, "SELECT MAX(instrument_id) FROM instruments")[[1]]
 
         shinyalert::shinyalert(paste0("Serial number ", input$serial_no, " added"), type = "success", timer = 2000)
-        new_entry <- TRUE
       }
     } else { #Modify an existing entry
       if (nchar(input$recorder) < 1 | nchar(input$make) < 1 | nchar(input$model) < 1 | nchar(input$type) < 1 | (nchar(input$serial_no) < 4 | nchar(input$instrument_owner) < 1 | (grepl("Search", input$serial_no, ignore.case = TRUE)))) { #long statement to check if all entries are satisfactorily filled in.
         shinyalert::shinyalert("Unfilled mandatory entries!", text = "You need to provide your name, instrument make, model, type, and serial number of minimum 2 characters.", type = "error")
-        new_entry <- FALSE
       } else {
-        exist_id <- DBI::dbGetQuery(pool, "SELECT instrument_id FROM instruments WHERE serial_no = '", input$existing_serial_no, "'")[[1]]
-        instrument.df <- data.frame(instrument_id = exist_id,
-                                    observer = input$recorder,
-                                    obs_datetime = as.character(.POSIXct(Sys.time(), tz = "UTC")),
-                                    make = input$make,
-                                    model = input$model,
-                                    type = input$type,
-                                    holds_replaceable_sensors = input$replaceableSensors,
-                                    serial_no = gsub("[^[:alnum:]]", "", input$existing_serial_no),
-                                    asset_tag = gsub("[^[:alnum:]]", "", input$asset_tag),
-                                    date_in_service = if (length(input$date_in_service) < 1) NA else as.character(input$date_in_service),
-                                    date_purchased = if (length(input$date_purchased) < 1) NA else as.character(input$date_purchased),
-                                    owner = input$instrument_owner,
-                                    retired_by = input$retired_by,
-                                    date_retired = if (length(input$date_retired) < 1) NA else as.character(input$date_retired))
-
         DBI::dbExecute(pool, paste0("UPDATE instruments SET observer = ", input$recorder,
                                     ", obs_datetime = '", as.character(.POSIXct(Sys.time(), tz = "UTC")),
                                     "', make = ", input$make,
                                     ", model = ", input$model,
                                     ", type = ", input$type,
                                     ", owner = '", input$instrument_owner,
-                                    ", holds_replaceable_sensors = ", input$replaceableSensors,
-                                    ", asset_tag = '", gsub("[^[:alnum:]]", "", input$asset_tag),
-                                    "', date_in_service = '", if (length(input$date_in_service) < 1) NA else as.character(input$date_in_service),
-                                    "', date_purchased = '", if (length(input$date_purchased) < 1) NA else as.character(input$date_purchased),
-                                    "', retired_by = '", input$retired_by,
-                                    "', date_retired = '", if (length(input$date_retired) < 1) NA else as.character(input$date_retired),
-                                    "' WHERE serial_no = '", input$existing_serial_no, "'"))
+                                    "', holds_replaceable_sensors = ", input$replaceableSensors,
+                                    " WHERE serial_no = '", input$existing_serial_no, "'"))
+
+        if (nchar(input$asset_tag) > 0) {
+          DBI::dbExecute(pool, paste0("UPDATE instruments SET asset_tag = '", gsub("[^[:alnum:]]", "", input$asset_tag), "' WHERE serial_no = '", input$existing_serial_no, "'"))
+        }
+        if (length(input$date_in_service) > 0) {
+          DBI::dbExecute(pool, paste0("UPDATE instruments SET date_in_service = '", input$date_in_service, "' WHERE serial_no = '", input$existing_serial_no, "'"))
+        }
+        if (length(input$date_purchased) > 0) {
+          DBI::dbExecute(pool, paste0("UPDATE instruments SET date_purchased = '", input$date_purchased, "' WHERE serial_no = '", input$existing_serial_no, "'"))
+        }
+        if (nchar(input$retired_by) > 0) {
+          DBI::dbExecute(pool, paste0("UPDATE instruments SET retired_by = '", input$retired_by, "' WHERE serial_no = '", input$existing_serial_no, "'"))
+        }
+        if (length(input$date_retired) > 0) {
+          DBI::dbExecute(pool, paste0("UPDATE instruments SET date_retired = '", input$date_retired, "' WHERE serial_no = '", input$existing_serial_no, "'"))
+        }
+
         shinyalert::shinyalert(paste0("Serial number ", input$existing_serial_no, " modified"), type = "success", timer = 2000)
         new_entry <- TRUE
       }
@@ -1581,7 +1573,7 @@ table.on("click", "tr", function() {
       instruments_data$maintainable_sensors <- instruments_sheet[instruments_sheet$type %in% c("Sonde", "Bulkhead") , ]
 
       #Reset some fields, show/hide others
-      updateSelectizeInput(session, "existing_serial_no", choices = c("New record", instruments_data$sheet$serial_no), selected = instrument.df$serial_no)
+      updateSelectizeInput(session, "existing_serial_no", choices = c("New record", instruments_data$sheet$serial_no), selected = input$existing_serial_no)
       updateTextInput(session, "serial_no", value = "")
       output$observer <- renderUI({
         selectizeInput("observer", label = "Calibrator name", choices = select_data$recorder)
@@ -1602,6 +1594,7 @@ table.on("click", "tr", function() {
       shinyjs::show("date_retired")
       shinyjs::show("retired_by")
       updateActionButton(session, "save_cal_instrument", "Save edits")
+
       #Re-render the tables
       instruments_data$manage_instruments <- instruments_data$sheet[ , !colnames(instruments_data$sheet) %in% c("instrument_id", "observer", "obs_datetime")]
       output$manage_instruments_table <- DT::renderDataTable(instruments_data$manage_instruments, rownames = FALSE, selection = "single")
