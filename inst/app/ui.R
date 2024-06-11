@@ -216,7 +216,7 @@ app_ui <- function(request) {
               actionButton("add_new_sensor_serial", "Add new sensor to database"),
               uiOutput("add_sensor_name"),
               textOutput("add_sensor_note"),
-              actionButton("add_sensor", "Submit")
+              actionButton("add_sensor_slot", "Submit")
             ),
             mainPanel(
               DT::dataTableOutput("manage_sensors_table"),

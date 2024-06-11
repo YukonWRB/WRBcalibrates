@@ -46,7 +46,7 @@ table.on("click", "tr", function() {
   instruments_data <- reactiveValues()
   select_data <- reactiveValues()  # Holds data to populate select menus
   sensors_data <- reactiveValues()
-  sensors_data$datetime <- as.character(.POSIXct(Sys.time(), tz = "UTC")) #get the time here so that multiple maintenance events are on same line
+  sensors_data$datetime <- .POSIXct(Sys.time(), tz = "UTC") #get the time here so that multiple maintenance events are on same line
   send_table <- reactiveValues()
   messages <- reactiveValues()
   complete <- reactiveValues()
@@ -87,7 +87,7 @@ table.on("click", "tr", function() {
   shinyjs::addClass("sensor7_show", "hidden")
   shinyjs::hide("sensor8_show")
   shinyjs::addClass("sensor8_show", "hidden")
-  shinyjs::hide("add_sensor")
+  shinyjs::hide("add_sensor_slot")
   shinyjs::hide("new_sensor_serial")
   shinyjs::hide("add_sensor_note")
   shinyjs::hide("sensor_change_note")
@@ -874,7 +874,7 @@ table.on("click", "tr", function() {
       shinyjs::addClass("sensor7_show", "hidden")
       shinyjs::hide("sensor8_show")
       shinyjs::addClass("sensor8_show", "hidden")
-      shinyjs::hide("add_sensor")
+      shinyjs::hide("add_sensor_slot")
       shinyjs::hide("add_sensor_note")
       shinyjs::hide("sensor_change_note")
       shinyjs::hide("add_sensor_type_dropdown")
@@ -914,7 +914,7 @@ table.on("click", "tr", function() {
       shinyjs::addClass("sensor7_show", "hidden")
       shinyjs::hide("sensor8_show")
       shinyjs::addClass("sensor8_show", "hidden")
-      shinyjs::hide("add_sensor")
+      shinyjs::hide("add_sensor_slot")
       shinyjs::hide("add_sensor_note")
       shinyjs::hide("sensor_change_note")
       shinyjs::hide("add_sensor_type_dropdown")
@@ -964,7 +964,7 @@ table.on("click", "tr", function() {
       output$manage_sensors_table <- DT::renderDataTable(temp_table, rownames = FALSE, selection = "single")
       updateSelectizeInput(session, "maintain_serial", choices = c("", instruments_data$maintainable_sensors$serial_no))
       shinyjs::hide("submit_btn")
-      shinyjs::hide("add_sensor")
+      shinyjs::hide("add_sensor_slot")
       shinyjs::hide("add_sensor_name")
       shinyjs::hide("add_sensor_note")
       shinyjs::hide("sensor_change_note")
@@ -995,7 +995,7 @@ table.on("click", "tr", function() {
       shinyjs::addClass("sensor7_show", "hidden")
       shinyjs::hide("sensor8_show")
       shinyjs::addClass("sensor8_show", "hidden")
-      shinyjs::hide("add_sensor")
+      shinyjs::hide("add_sensor_slot")
       shinyjs::hide("add_sensor_note")
       shinyjs::hide("sensor_change_note")
       shinyjs::hide("add_sensor_type_dropdown")
@@ -1037,7 +1037,7 @@ table.on("click", "tr", function() {
     shinyjs::addClass("sensor7_show", "hidden")
     shinyjs::hide("sensor8_show")
     shinyjs::addClass("sensor8_show", "hidden")
-    shinyjs::hide("add_sensor")
+    shinyjs::hide("add_sensor_slot")
     shinyjs::hide("add_sensor_note")
     shinyjs::hide("sensor_change_note")
     shinyjs::hide("add_sensor_type_dropdown")
@@ -1079,7 +1079,7 @@ table.on("click", "tr", function() {
       shinyjs::addClass("sensor7_show", "hidden")
       shinyjs::hide("sensor8_show")
       shinyjs::addClass("sensor8_show", "hidden")
-      shinyjs::hide("add_sensor")
+      shinyjs::hide("add_sensor_slot")
       shinyjs::hide("add_sensor_note")
       shinyjs::hide("add_sensor_type_dropdown")
       shinyjs::hide("sensor_change_note")
@@ -1140,7 +1140,7 @@ table.on("click", "tr", function() {
             }
           }
         } else {
-          shinyjs::show("add_sensor")
+          shinyjs::show("add_sensor_slot")
           shinyjs::show("new_sensor_serial")
           shinyjs::show("add_sensor_note")
           shinyjs::show("add_sensor_name")
@@ -1150,7 +1150,7 @@ table.on("click", "tr", function() {
   }, ignoreInit = TRUE)
 
   observeEvent(input$add_sensor_type_dropdown, {
-    shinyjs::show("add_sensor")
+    shinyjs::show("add_sensor_slot")
     shinyjs::show("new_sensor_serial")
     shinyjs::show("add_sensor_note")
     shinyjs::show("add_sensor_name")
@@ -1193,8 +1193,8 @@ table.on("click", "tr", function() {
         selectizeInput("new_sensor_make", "Make (type your own if not in yet)", choices = unique(sensors_data$sensors$sensor_make), options = list(create = TRUE)),
         selectizeInput("new_sensor_model", "Model (type your own if not in yet)", choices = unique(sensors_data$sensors$sensor_model), options = list(create = TRUE)),
         textInput("new_sensor_asset_tag", "Asset tag (optional)"),
-        dateInput("new_sensor_date_purchased", "Date purchased (if known)"),
-        dateInput("new_sensor_date_in_service", "Date in service (if known)", value = Sys.Date()),
+        dateInput("new_sensor_date_purchased", "Date purchased (if known)", value = ""),
+        dateInput("new_sensor_date_in_service", "Date in service (if known)", value = ""),
         textAreaInput("new_sensor_notes", "Notes (optional)"),
         actionButton("add_sensor_to_db", "Add sensor")
       ))
@@ -1208,8 +1208,8 @@ table.on("click", "tr", function() {
       selectizeInput("new_sensor_make", "Make (type your own if not in yet)", choices = unique(sensors_data$sensors$sensor_make), options = list(create = TRUE)),
       selectizeInput("new_sensor_model", "Model (type your own if not in yet)", choices = unique(sensors_data$sensors$sensor_model), options = list(create = TRUE)),
       textInput("new_sensor_asset_tag", "Asset tag (optional)"),
-      dateInput("new_sensor_date_purchased", "Date purchased"),
-      dateInput("new_sensor_date_in_service", "Date in service", value = Sys.Date()),
+      dateInput("new_sensor_date_purchased", "Date purchased", value = ""),
+      dateInput("new_sensor_date_in_service", "Date in service", value = ""),
       textAreaInput("new_sensor_notes", "Notes (optional)"),
       actionButton("add_sensor_to_db2", "Add sensor")
     ))
@@ -1263,13 +1263,12 @@ table.on("click", "tr", function() {
 
 
   ## Add a sensor to a new slot, or modify a sensor added in this same session ############################
-  observeEvent(input$add_sensor, {
+  observeEvent(input$add_sensor_slot, {
     #find out if an entry already has the timestamp sensors_data$datetime for this same instrument (sensors_data$instrument is already subset to the instrument_id)
     if (length(sensors_data$instrument$obs_datetime) == 0) {
       sensors_data$datetime_exists <- FALSE
     } else {
-      sensors_data$datetime_exists <- if (max(sensors_data$instrument$obs_datetime) == sensors_data$datetime) TRUE else FALSE
-
+      sensors_data$datetime_exists <- if (max(sensors_data$instrument$obs_datetime) > (sensors_data$datetime - 5) | max(sensors_data$instrument$obs_datetime) > (sensors_data$datetime + 5)) TRUE else FALSE
     }
 
     sensor_id <- sensors_data$sensors[sensors_data$sensors$sensor_serial == input$new_sensor_serial, "sensor_id"]
@@ -1282,15 +1281,14 @@ table.on("click", "tr", function() {
     col_comment <- paste0("sensor", sensors_data$number + 1, "_notes")
 
     if (sensors_data$datetime_exists) { #modifying an existing entry
-      DBI::dbExecute(pool, paste0("UPDATE array_maintenance_changes SET ", col_id, " = ", sensor_id, ", ", col_comment, " = '", comment, "', WHERE obs_datetime = '", sensors_data$datetime, "' AND instrument_id = ", sensors_data$instrument_id, ";"))
+      DBI::dbExecute(pool, paste0("UPDATE array_maintenance_changes SET ", col_id, " = ", sensor_id, ", ", col_comment, " = '", comment, "' WHERE obs_datetime = '", sensors_data$datetime, "' AND instrument_id = ", sensors_data$instrument_id, ";"))
     } else { # Creating a new entry, starting out with the last entry in the array_maintenance_changes table so that sensor changes are noted
       # Take the final row of the array_maintenance_changes table and replace fields
       if (nrow(sensors_data$instrument) == 0) { # Nothing to go off of, so make a new df to append
         df <- data.frame(instrument_id = sensors_data$instrument_id)
       } else {
-        df <- sensors_data$instrument[nrow(sensors_data$instrument), ]
+        df <- sensors_data$instrument[nrow(sensors_data$instrument), c("instrument_id", "sensor1_id", "sensor2_id", "sensor3_id", "sensor4_id", "sensor5_id", "sensor6_id", "sensor7_id", "sensor8_id")]
       }
-      df$event_id <- NULL
       df$obs_datetime <- sensors_data$datetime
       df$observer <- input$add_sensor_name
 
@@ -1307,13 +1305,12 @@ table.on("click", "tr", function() {
     shinyjs::show(paste0("sensor", sensors_data$number, "_show")) # show the new sensor button
     shinyjs::removeClass(paste0("sensor", sensors_data$number, "_show"), "hidden")
     shinyjs::hide("add_sensor_name")
-    shinyjs::hide("add_sensor")
+    shinyjs::hide("add_sensor_slot")
     shinyjs::hide("new_sensor_serial")
     shinyjs::hide("add_sensor_note")
 
-    lab <- paste0("Slot ", sensors_data$number + 1, "<br>", type)
-    updateActionButton(session, paste0("sensor", sensors_data$number + 1, "_show"), label = HTML(lab))
-    sensors_data$number <- sensors_data$number + 1
+    lab <- paste0("Slot ", sensors_data$number, "<br>", type)
+    updateActionButton(session, paste0("sensor", sensors_data$number, "_show"), label = HTML(lab))
     sensors_data$datetime_exists <- TRUE
   }, ignoreInit = TRUE, ignoreNULL = TRUE)
 
@@ -1348,7 +1345,9 @@ table.on("click", "tr", function() {
 
     # Update inputs with the sensor's *current* details
     updateSelectizeInput(session, "change_sensor", selected = type_ids[length(type_ids)])
-    serial_choices <- sensors_data$sensors[sensors_data$sensors$type_id == input$add_sensor_type_dropdown, "sensor_serial"]
+    # serial_choices <- sensors_data$sensors[sensors_data$sensors$type_id == input$add_sensor_type_dropdown, "sensor_serial"]
+    serial_choices <- sensors_data$sensors[sensors_data$sensors$sensor_type == input$change_sensor, "sensor_serial"]
+
     if (sensors_data$datetime_exists) {
       # Determine if the user is making an edit (i.e. they visited this sensor already in this session) or if they're saving anew
       if (sensors_data$instrument[sensors_data$instrument$obs_datetime == sensors_data$datetime, "instrument_id"] == sensors_data$instrument_id) {
@@ -1396,7 +1395,7 @@ table.on("click", "tr", function() {
 
   ## Save changes to a sensor's details ########################################
   observeEvent(input$submit_sensor_change, {
-    if (nchar(input$sensor_change_name) <= 1 & nchar(input$add_comment) < 5 & nchar(input$add_sensor_serial) < 2) {
+    if (nchar(input$sensor_change_name) <= 1 | nchar(input$add_comment) < 5 | nchar(input$add_sensor_serial) < 2) {
       shinyalert::shinyalert("Please fill in all fields!", "You might need a few more characters if you've already written something. Come on, make us a useful note!", type =  "error", timer = 3000)
     } else { #add the data to the array_maintenance_changes table
       # Check if the datetime exists in the instrument table, which means we're editing an entry from this same session
@@ -1413,7 +1412,6 @@ table.on("click", "tr", function() {
       } else  { #append to array_maintenance_changes with a new row
         # Take the final row of the array_maintenance_changes table and replace fields. Remove notes from all other sensors; they don't share a datetime with the current session.
         df <- sensors_data$instrument[nrow(sensors_data$instrument), c("instrument_id", "sensor1_id", "sensor2_id", "sensor3_id", "sensor4_id", "sensor5_id", "sensor6_id", "sensor7_id", "sensor8_id")]
-        df$event_id <- NULL
         df$obs_datetime <- sensors_data$datetime
         df$observer <- input$sensor_change_name
 
