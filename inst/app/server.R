@@ -1281,7 +1281,7 @@ table.on("click", "tr", function() {
     col_comment <- paste0("sensor", sensors_data$number + 1, "_notes")
 
     if (sensors_data$datetime_exists) { #modifying an existing entry
-      DBI::dbExecute(pool, paste0("UPDATE array_maintenance_changes SET ", col_id, " = ", sensor_id, ", ", col_comment, " = '", comment, "' WHERE obs_datetime = '", sensors_data$datetime, "' AND instrument_id = ", sensors_data$instrument_id, ";"))
+      DBI::dbExecute(pool, paste0("UPDATE array_maintenance_changes SET ", col_id, " = ", sensor_id, ", ", col_comment, " = '", comment, "' WHERE obs_datetime BETWEEN '", sensors_data$datetime - 5, "' AND '", sensors_data$datetime + 5, "' AND instrument_id = ", sensors_data$instrument_id, ";"))
     } else { # Creating a new entry, starting out with the last entry in the array_maintenance_changes table so that sensor changes are noted
       # Take the final row of the array_maintenance_changes table and replace fields
       if (nrow(sensors_data$instrument) == 0) { # Nothing to go off of, so make a new df to append
