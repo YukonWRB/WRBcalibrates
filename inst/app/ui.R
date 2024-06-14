@@ -232,7 +232,7 @@ app_ui <- function(request) {
               selectizeInput("change_sensor", "Assign a new sensor or leave as-is to log only maintenance note", choices = "placeholder", width = "500px"),
               selectizeInput("add_sensor_serial", "Serial number (type your own if not in yet)", choices = NULL, options = list(create = TRUE)),
               actionButton("add_new_sensor_serial2", "Add new sensor to database"),
-              textAreaInput("add_comment", "Add a note", "", height = "100px", width = "800px"),
+              textAreaInput("add_comment", "Add a note (date is already captured)", "", height = "100px", width = "800px"),
               uiOutput("sensor_change_name"),
               actionButton("submit_sensor_change", "Submit new record")
             )

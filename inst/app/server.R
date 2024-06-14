@@ -170,11 +170,13 @@ table.on("click", "tr", function() {
 
   observe({
     if (!restarted$initialized) {
+
       instruments_data$observers$observer_string <- paste0(instruments_data$observers$observer_first, " ", instruments_data$observers$observer_last, " (", instruments_data$observers$organization, ")")
       select_data$recorder <- setNames(c(instruments_data$observers$observer_id, "new"), c(instruments_data$observers$observer_string, "Add new observer"))
       select_data$makes <- setNames(c(instruments_data$makes$make_id, "new"), c(instruments_data$makes$make, "Add new make"))
       select_data$models <- setNames(c(instruments_data$models$model_id, "new"), c(instruments_data$models$model, "Add new model"))
       select_data$types <- setNames(c(instruments_data$types$type_id, "new"), c(instruments_data$types$type, "Add new type"))
+
 
       # look for a cookie with the last observer ID
       shinyjs::runjs("
@@ -1323,35 +1325,34 @@ table.on("click", "tr", function() {
     sensor_details_name <- paste0("sensor", sensor_index, "_details")
     sensors_data$selected <- paste0("sensor", sensor_index)
 
-    sensor_ids <- sensors_data$sensors[sensors_data$sensors$sensor_id %in% sensors_data$instrument[, paste0("sensor", sensor_index, "_id")], "sensor_id"]
-    type_ids <- sensors_data$sensors[sensors_data$sensors$sensor_id %in% sensor_ids, "sensor_type"]
-    sensor_types <- sensors_data$sensor_types[sensors_data$sensor_types$sensor_type_id %in% type_ids, "sensor_type"]
-    sensor_serials <- sensors_data$sensors[sensors_data$sensors$sensor_id %in% sensors_data$instrument[ , sensor_id_col], "sensor_serial"]
+    sub <- merge(sensors_data$sensors[sensors_data$sensors$sensor_id == sensors_data$instrument[, sensor_id_col], c("sensor_type", "sensor_id", "sensor_serial")], sensors_data$sensor_types[, c("sensor_type_id", "sensor_type")], by.x = "sensor_type", by.y = "sensor_type_id", sort = FALSE)
+    sub <- merge(sub, sensors_data$instrument[, c("obs_datetime", sensor_notes_col, sensor_id_col, "observer")], by.x = "sensor_id", by.y = sensor_id_col, sort = FALSE)
+    sub <- merge(sub, instruments_data$observers[, c("observer_id", "observer_string")], by.x = "observer", by.y = "observer_id", sort = FALSE)
 
-    sensors_data$datetime_exists <- if (max(sensors_data$instrument$obs_datetime) == sensors_data$datetime) TRUE else FALSE
+    sensors_data$datetime_exists <- if (max(sensors_data$instrument$obs_datetime) > (sensors_data$datetime - 5) | max(sensors_data$instrument$obs_datetime) > (sensors_data$datetime + 5)) TRUE else FALSE
 
     df <- data.frame(
-      "Date/time" = substr(sensors_data$instrument$obs_datetime, 1, 16),
-      "Type" = sensor_types,
-      "Serial" = sensor_serials,
-      "Notes" = sensors_data$instrument[[sensor_notes_col]],
+      "Date/time" = substr(sub$obs_datetime, 1, 16),
+      "Type" = sub$sensor_type.y,
+      "Serial" = sub$sensor_serial,
+      "Notes" = sub[, sensor_notes_col],
+      "Observer" = sub$observer_string,
       check.names = FALSE
     )
     df <- df[!is.na(df$Notes), ]
 
     sensors_data[[sensor_details_name]] <- df
 
-    output[[sensor_details_name]] <- DT::renderDataTable(sensors_data[[sensor_details_name]], rownames = FALSE)
+    output[[sensor_details_name]] <- DT::renderDataTable(df, rownames = FALSE)
 
     # Update inputs with the sensor's *current* details
-    updateSelectizeInput(session, "change_sensor", selected = type_ids[length(type_ids)])
-    # serial_choices <- sensors_data$sensors[sensors_data$sensors$type_id == input$add_sensor_type_dropdown, "sensor_serial"]
+    updateSelectizeInput(session, "change_sensor", selected = sub[nrow(sub), "sensor_type"])
     serial_choices <- sensors_data$sensors[sensors_data$sensors$sensor_type == input$change_sensor, "sensor_serial"]
 
     if (sensors_data$datetime_exists) {
       # Determine if the user is making an edit (i.e. they visited this sensor already in this session) or if they're saving anew
       if (sensors_data$instrument[sensors_data$instrument$obs_datetime == sensors_data$datetime, "instrument_id"] == sensors_data$instrument_id) {
-        updateSelectizeInput(session, "add_sensor_serial", choices = serial_choices, selected = sensor_serials[length(sensor_serials)])
+        updateSelectizeInput(session, "add_sensor_serial", choices = serial_choices, selected = sub[nrow(sub), "sensor_serial"])
         updateTextAreaInput(session, "add_comment", value = sensors_data$instrument[nrow(sensors_data$instrument), sensor_notes_col])
         output$sensor_change_name <- renderUI({
           selectizeInput("sensor_change_name", label = "Observer name", choices = select_data$recorder, selected = sensors_data$instrument[nrow(sensors_data$instrument), "observer"])
@@ -1399,7 +1400,7 @@ table.on("click", "tr", function() {
       shinyalert::shinyalert("Please fill in all fields!", "You might need a few more characters if you've already written something. Come on, make us a useful note!", type =  "error", timer = 3000)
     } else { #add the data to the array_maintenance_changes table
       # Check if the datetime exists in the instrument table, which means we're editing an entry from this same session
-      sensors_data$datetime_exists <- if (max(sensors_data$instrument$obs_datetime) == sensors_data$datetime) TRUE else FALSE
+      sensors_data$datetime_exists <- if (max(sensors_data$instrument$obs_datetime) > (sensors_data$datetime - 5) | max(sensors_data$instrument$obs_datetime) > (sensors_data$datetime + 5)) TRUE else FALSE
 
       sensor_id <- sensors_data$sensors[sensors_data$sensors$sensor_serial == input$add_sensor_serial, "sensor_id"]
 
