@@ -1736,7 +1736,7 @@ table.on("click", "tr", function() {
       })
       restarted$restarted <- TRUE
       updateCheckboxInput(session, "spc_or_not", value = FALSE) #Reset to FALSE since values are stored as SpC; this makes it clear to the user.
-      updateSelectizeInput(session, "first_selection", selected = "Calibrate") #Changing this selection brings the user right to the calibration page
+      updateSelectizeInput(session, "first_selection", selected = "Calibrate") # Changing this selection brings the user right to the calibration page
     }
   }, ignoreInit = TRUE)
 
@@ -1756,7 +1756,16 @@ table.on("click", "tr", function() {
 
       DBI::dbExecute(pool, paste0("DELETE FROM calibrations WHERE calibration_id = ", delete_ID))  # Cascades to all other sheets where the id is referenced
 
-      complete$incomplete <- complete$incomplete[!complete$incomplete$Index == delete_value ,]
+      # Reload the calibrations table and re-create incomplete_calibrations
+      calibrations$calibrations <- DBI::dbGetQuery(pool, "SELECT * FROM calibrations")  # This will be used to check if there are any incomplete calibrations
+      incomplete_calibrations <- calibrations$calibrations[calibrations$calibrations$complete == FALSE, ] # find out if any calibrations are labelled as incomplete
+      calibrations$incomplete_calibrations <- incomplete_calibrations
+
+      complete$incomplete <- data.frame("Index" = seq(1, nrow(incomplete_calibrations)),
+                                        "Calibrator" = as.vector(incomplete_calibrations$observer_string),
+                                        "Date/time UTC" = incomplete_calibrations$obs_datetime,
+                                        check.names = FALSE)
+
       if (nrow(complete$incomplete) == 0) {
         complete$incomplete <- data.frame("Index" = 0,
                                           "Calibrator" = "No unsaved calibrations!",
@@ -1764,6 +1773,8 @@ table.on("click", "tr", function() {
                                           check.names = FALSE)
       }
       output$incomplete_table <- DT::renderDataTable(complete$incomplete, rownames = FALSE, selection = "single")
+      updateNumericInput(session, "restart_index", min = 0, max = nrow(calibrations$incomplete_calibrations), value = 0)
+
       calibrations$incomplete_calibrations <- calibrations$incomplete_calibrations[!calibrations$incomplete_calibrations$calibration_id == delete_ID ,]
       #reset internal markers of completeness
       complete$basic <- FALSE
@@ -1785,7 +1796,6 @@ table.on("click", "tr", function() {
         reset_do()
         reset_depth()
       }
-      updateNumericInput(session, "restart_index", value = 0)
       shinyalert::shinyalert("Deleted", type = "success", immediate = TRUE, timer = 2000)
     }
   }, ignoreInit = TRUE)
@@ -1794,10 +1804,10 @@ table.on("click", "tr", function() {
   # Update the SpC and DO fields ##########################################
   observeEvent(input$spc_or_not, {
     if (input$spc_or_not) {
-      updateNumericInput(session, "SpC1_pre", label = "Conducvitity Low-Range Pre-Cal Value")
-      updateNumericInput(session, "SpC1_post", label = "Conducvitity Low-Range Post-Cal Value")
-      updateNumericInput(session, "SpC2_pre", label = "Conducvitity High-Range Pre-Cal Value")
-      updateNumericInput(session, "SpC2_post", label = "Conducvitity High-Range Post-Cal Value")
+      updateNumericInput(session, "SpC1_pre", label = "Conductivity Low-Range Pre-Cal Value")
+      updateNumericInput(session, "SpC1_post", label = "Conductivity Low-Range Post-Cal Value")
+      updateNumericInput(session, "SpC2_pre", label = "Conductivity High-Range Pre-Cal Value")
+      updateNumericInput(session, "SpC2_post", label = "Conductivity High-Range Post-Cal Value")
     } else {
       updateNumericInput(session, "SpC1_pre", label = "SpC Low-Range Pre-Cal Value")
       updateNumericInput(session, "SpC1_post", label = "SpC Low-Range Post-Cal Value")
@@ -1808,7 +1818,7 @@ table.on("click", "tr", function() {
 
   observe( #Updates the SPC or non-spc values based on reference temperature input$spc_or_not changing
     if (input$spc_or_not) {
-      post_condy_val <- input$SpC2_std/(1+0.02*(calibration_data$temp$temp_reference - 25))
+      post_condy_val <- input$SpC2_std/(1 + 0.02 * (calibration_data$temp$temp_reference - 25))
       updateNumericInput(session, "SpC2_post", value = round(post_condy_val, 0))
     } else {
       updateNumericInput(session, "SpC2_post", value = input$SpC2_std)
@@ -2441,18 +2451,29 @@ observeEvent(validation_check$orp, {
                                          spc2_std = input$SpC2_std,
                                          spc2_pre = if (input$spc_or_not) input$SpC2_pre/(1 + 0.02*(calibration_data$temp$temp_reference - 25)) else input$SpC2_pre,
                                          spc2_post = if (input$spc_or_not) input$SpC2_post/(1 + 0.02*(calibration_data$temp$temp_reference - 25)) else input$SpC2_post)
+
       if (!complete$SpC) {
-        DBI::dbAppendTable(pool, "calibrate_specific_conductance", calibration_data$SpC)
-        complete$SpC <- TRUE
-        shinyjs::show("delete_SpC")
+        tryCatch({
+          DBI::dbAppendTable(pool, "calibrate_specific_conductance", calibration_data$SpC)
+          complete$SpC <- TRUE
+          shinyjs::show("delete_SpC")
+        }, error = function(e) {
+          shinyalert::shinyalert(title = "Failed to make new entry to database... are you sure all entries are correct and that you are entering specific or non-specific conductivity as required by your instrument?", type = "error", timer = 4000)
+          return()
+        })
       } else {
-        DBI::dbExecute(pool, paste0("UPDATE calibrate_specific_conductance SET spc1_std = ", input$SpC1_std,
-                                    " spc1_pre = ", if (input$spc_or_not) input$SpC1_pre/(1 + 0.02*(calibration_data$temp$temp_reference - 25)) else input$SpC1_pre,
-                                    " spc1_post = ", if (input$spc_or_not) input$SpC1_post/(1 + 0.02*(calibration_data$temp$temp_reference - 25)) else input$SpC1_post,
-                                    " spc2_std = ", input$SpC2_std,
-                                    " spc2_pre = ", if (input$spc_or_not) input$SpC2_pre/(1 + 0.02*(calibration_data$temp$temp_reference - 25)) else input$SpC2_pre,
-                                    " spc2_post = ", if (input$spc_or_not) input$SpC2_post/(1 + 0.02*(calibration_data$temp$temp_reference - 25)) else input$SpC2_post,
-                                    " WHERE calibration_id = ", calibration_data$next_id))
+        tryCatch({
+          DBI::dbExecute(pool, paste0("UPDATE calibrate_specific_conductance SET spc1_std = ", input$SpC1_std,
+                                      " spc1_pre = ", if (input$spc_or_not) input$SpC1_pre/(1 + 0.02*(calibration_data$temp$temp_reference - 25)) else input$SpC1_pre,
+                                      " spc1_post = ", if (input$spc_or_not) input$SpC1_post/(1 + 0.02*(calibration_data$temp$temp_reference - 25)) else input$SpC1_post,
+                                      " spc2_std = ", input$SpC2_std,
+                                      " spc2_pre = ", if (input$spc_or_not) input$SpC2_pre/(1 + 0.02*(calibration_data$temp$temp_reference - 25)) else input$SpC2_pre,
+                                      " spc2_post = ", if (input$spc_or_not) input$SpC2_post/(1 + 0.02*(calibration_data$temp$temp_reference - 25)) else input$SpC2_post,
+                                      " WHERE calibration_id = ", calibration_data$next_id))
+        }, error = function(e) {
+          shinyalert::shinyalert(title = "Failed to edit existing database entry... are you sure all entries are correct and that you are entering specific or non-specific conductivity as required by your instrument?", type = "error", timer = 4000)
+          return()
+          })
       }
       if ("Conductivity calibration" %in% send_table$saved[ ,1] | "Conductivity calibration" %in% send_table$restarted_cal[ ,1]) {
         shinyalert::shinyalert(title = "Conductivity calibration overwritten", type = "success", timer = 2000, immediate = TRUE)
