@@ -579,17 +579,14 @@ table.on("click", "tr", function() {
     updateNumericInput(session, "pH2_std", label = "Neutral pH solution value", value = "7")
     updateNumericInput(session, "pH3_std", label = "High pH solution value", value = "10")
     updateNumericInput(session, "pH1_pre_val", label = "pH 4 Pre-Cal Value", value = "")
-    updateNumericInput(session, "pH1_pre_mV", label = "pH 4 mV", value = "")
     updateNumericInput(session, "pH2_pre_val", label = "pH 7 Pre-Cal Value", value = "")
-    updateNumericInput(session, "pH2_pre_mV", label = "pH 7 mV", value = "")
     updateNumericInput(session, "pH3_pre_val", label = "pH 10 Pre-Cal Value", value = "")
-    updateNumericInput(session, "pH3_pre_mV", label = "pH 10 mV", value = "")
-    updateNumericInput(session, "pH1_post_val", label = "pH 4 Post-Cal Value", value = "")
-    updateNumericInput(session, "pH1_post_mV", label = "pH 4 Post-Cal mV", value = "")
-    updateNumericInput(session, "pH2_post_val", label = "pH 7 Post-Cal Value", value = "")
-    updateNumericInput(session, "pH2_post_mV", label = "pH 7 Post-Cal mV", value = "")
-    updateNumericInput(session, "pH3_post_val", label = "pH 10 Post-Cal Value", value = "")
-    updateNumericInput(session, "pH3_post_mV", label = "pH 10 Post-Cal mV", value = "")
+    updateNumericInput(session, "pH1_post_val", label = "pH 4 Post-Cal Value", value = "4")
+    updateNumericInput(session, "pH1_mV", label = "pH 4 Post-Cal mV", value = "")
+    updateNumericInput(session, "pH2_post_val", label = "pH 7 Post-Cal Value", value = "7")
+    updateNumericInput(session, "pH2_mV", label = "pH 7 Post-Cal mV", value = "")
+    updateNumericInput(session, "pH3_post_val", label = "pH 10 Post-Cal Value", value = "10")
+    updateNumericInput(session, "pH3_mV", label = "pH 10 Post-Cal mV", value = "")
     shinyjs::hide("delete_pH")
   }
   reset_temp <- function() {
@@ -607,10 +604,10 @@ table.on("click", "tr", function() {
   reset_spc <- function() {
     updateNumericInput(session, "SpC1_std", label = "SpC Low-Range Standard", value = "0")
     updateNumericInput(session, "SpC1_pre", label = "SpC Low-Range Pre-Cal Value", value = "")
-    updateNumericInput(session, "SpC1_post", label = "SpC Low-Range Post-Cal Value", value = "")
+    updateNumericInput(session, "SpC1_post", label = "SpC Low-Range Post-Cal Value", value = "0")
     updateNumericInput(session, "SpC2_std", label = "SpC High-Range Standard", value = "1413")
     updateNumericInput(session, "SpC2_pre", label = "SpC High-Range Pre-Cal Value", value = "")
-    updateNumericInput(session, "SpC2_post", label = "SpC High-Range Post-Cal Value", value = "")
+    updateNumericInput(session, "SpC2_post", label = "SpC High-Range Post-Cal Value", value = "1413")
     shinyjs::hide("delete_SpC")
   }
   reset_turb <- function() {
@@ -618,8 +615,8 @@ table.on("click", "tr", function() {
     updateNumericInput(session, "turb2_std", label = "High Turb Standard Value", value = "124")
     updateNumericInput(session, "turb1_pre", label = "Low Turb Pre-cal Value", value = "")
     updateNumericInput(session, "turb2_pre", label = "High Turb Pre-cal Value", value = "")
-    updateNumericInput(session, "turb1_post", label = "Low Turb Post-cal Value", value = "")
-    updateNumericInput(session, "turb2_post", label = "High Turb Post-cal Value", value = "")
+    updateNumericInput(session, "turb1_post", label = "Low Turb Post-cal Value", value = "0")
+    updateNumericInput(session, "turb2_post", label = "High Turb Post-cal Value", value = "124")
     shinyjs::hide("delete_turb")
   }
   reset_do <- function() {
@@ -2126,7 +2123,6 @@ observeEvent(validation_check$pH, {
   }, ignoreInit = TRUE)
 
   observeEvent(input$delete_pH, {
-    shinyalert::shinyalert("Deleting...", type = "info")
     #delete on remote sheet
     DBI::dbExecute(pool, paste0("DELETE FROM calibrate_ph WHERE calibration_id = ", calibration_data$next_id))
     #reset the fields
@@ -2229,7 +2225,6 @@ observeEvent(validation_check$pH, {
   }, ignoreInit = TRUE)
 
   observeEvent(input$delete_temp, {
-    shinyalert::shinyalert("Deleting...", type = "info")
     DBI::dbExecute(pool, paste0("DELETE FROM calibrate_temperature WHERE calibration_id = ", calibration_data$next_id))
     #reset the fields
     reset_temp()
@@ -2308,8 +2303,8 @@ observeEvent(validation_check$orp, {
         shinyjs::show("delete_orp")
       } else {
         DBI::dbExecute(pool, paste0("UPDATE calibrate_orp SET orp_std = ", input$orp_std,
-                                    " orp_pre_mv = ", input$orp_pre_mV,
-                                    " orp_post_mv = ", input$orp_post_mV,
+                                    ", orp_pre_mv = ", input$orp_pre_mV,
+                                    ", orp_post_mv = ", input$orp_post_mV,
                                     " WHERE calibration_id = ", calibration_data$next_id))
       }
       if ("ORP calibration" %in% send_table$saved[ ,1] | "ORP calibration" %in% send_table$restarted_cal[ ,1]) {
@@ -2329,7 +2324,6 @@ observeEvent(validation_check$orp, {
   }, ignoreInit = TRUE)
 
   observeEvent(input$delete_orp, {
-    shinyalert::shinyalert("Deleting...", type = "info")
     DBI::dbExecute(pool, paste0("DELETE FROM calibrate_orp WHERE calibration_id = ", calibration_data$next_id))
     #reset the fields
     reset_orp()
@@ -2362,6 +2356,21 @@ observeEvent(validation_check$orp, {
       updateSelectizeInput(session, "selection", selected = "Temperature calibration")
       return()
     } else {
+      if (is.na(input$SpC1_post)) {
+        updateNumericInput(session, "SpC1_post", value = input$SpC1_std)
+      }
+      if (is.na(input$SpC2_post)) {
+        updateNumericInput(session, "SpC2_post", value = input$SpC2_std)
+      }
+      if (is.na(input$SpC1_pre)) {
+        shinyalert::shinyalert("You must enter a pre-calibration value for the low-range conductivity/conductance", type = "error")
+        return()
+      }
+      if (is.na(input$SpC2_pre)) {
+        shinyalert::shinyalert("You must enter a pre-calibration value for the high-range conductivity/conductance", type = "error")
+        return()
+      }
+
       tryCatch({
         SpC1_ref <- input$SpC1_std
         SpC2_ref <- input$SpC2_std
@@ -2455,44 +2464,58 @@ observeEvent(validation_check$orp, {
       if (!complete$SpC) {
         tryCatch({
           DBI::dbAppendTable(pool, "calibrate_specific_conductance", calibration_data$SpC)
+
+          if ("Conductivity calibration" %in% send_table$saved[ ,1] | "Conductivity calibration" %in% send_table$restarted_cal[ ,1]) {
+            shinyalert::shinyalert(title = "Conductivity calibration overwritten", type = "success", timer = 2000, immediate = TRUE)
+          } else {
+            shinyalert::shinyalert(title = "Conductivity calibration saved", type = "success", timer = 2000, immediate = TRUE)
+          }
+          if (send_table$saved[1,1] == "Nothing saved yet") {
+            send_table$saved[1,1] <- "Conductivity calibration"
+          } else if (!("Conductivity calibration" %in% send_table$saved[ ,1])) {
+            send_table$saved[nrow(send_table$saved) + 1, 1] <- "Conductivity calibration"
+          }
+          output$saved <- renderTable({ # Display local calibrations table
+            send_table$saved
+          })
+
           complete$SpC <- TRUE
           shinyjs::show("delete_SpC")
         }, error = function(e) {
           shinyalert::shinyalert(title = "Failed to make new entry to database... are you sure all entries are correct and that you are entering specific or non-specific conductivity as required by your instrument?", type = "error", timer = 4000)
-          return()
         })
       } else {
         tryCatch({
           DBI::dbExecute(pool, paste0("UPDATE calibrate_specific_conductance SET spc1_std = ", input$SpC1_std,
-                                      " spc1_pre = ", if (input$spc_or_not) input$SpC1_pre/(1 + 0.02*(calibration_data$temp$temp_reference - 25)) else input$SpC1_pre,
-                                      " spc1_post = ", if (input$spc_or_not) input$SpC1_post/(1 + 0.02*(calibration_data$temp$temp_reference - 25)) else input$SpC1_post,
-                                      " spc2_std = ", input$SpC2_std,
-                                      " spc2_pre = ", if (input$spc_or_not) input$SpC2_pre/(1 + 0.02*(calibration_data$temp$temp_reference - 25)) else input$SpC2_pre,
-                                      " spc2_post = ", if (input$spc_or_not) input$SpC2_post/(1 + 0.02*(calibration_data$temp$temp_reference - 25)) else input$SpC2_post,
+                                      ", spc1_pre = ", if (input$spc_or_not) input$SpC1_pre/(1 + 0.02*(calibration_data$temp$temp_reference - 25)) else input$SpC1_pre,
+                                      ", spc1_post = ", if (input$spc_or_not) input$SpC1_post/(1 + 0.02*(calibration_data$temp$temp_reference - 25)) else input$SpC1_post,
+                                      ", spc2_std = ", input$SpC2_std,
+                                      ", spc2_pre = ", if (input$spc_or_not) input$SpC2_pre/(1 + 0.02*(calibration_data$temp$temp_reference - 25)) else input$SpC2_pre,
+                                      ", spc2_post = ", if (input$spc_or_not) input$SpC2_post/(1 + 0.02*(calibration_data$temp$temp_reference - 25)) else input$SpC2_post,
                                       " WHERE calibration_id = ", calibration_data$next_id))
-        }, error = function(e) {
-          shinyalert::shinyalert(title = "Failed to edit existing database entry... are you sure all entries are correct and that you are entering specific or non-specific conductivity as required by your instrument?", type = "error", timer = 4000)
-          return()
+
+          if ("Conductivity calibration" %in% send_table$saved[ ,1] | "Conductivity calibration" %in% send_table$restarted_cal[ ,1]) {
+            shinyalert::shinyalert(title = "Conductivity calibration overwritten", type = "success", timer = 2000, immediate = TRUE)
+          } else {
+            shinyalert::shinyalert(title = "Conductivity calibration saved", type = "success", timer = 2000, immediate = TRUE)
+          }
+          if (send_table$saved[1,1] == "Nothing saved yet") {
+            send_table$saved[1,1] <- "Conductivity calibration"
+          } else if (!("Conductivity calibration" %in% send_table$saved[ ,1])) {
+            send_table$saved[nrow(send_table$saved) + 1, 1] <- "Conductivity calibration"
+          }
+          output$saved <- renderTable({ # Display local calibrations table
+            send_table$saved
           })
+
+        }, error = function(e) {
+          shinyalert::shinyalert(title = "Failed to edit existing database entry.", text = e$message, type = "error")
+        })
       }
-      if ("Conductivity calibration" %in% send_table$saved[ ,1] | "Conductivity calibration" %in% send_table$restarted_cal[ ,1]) {
-        shinyalert::shinyalert(title = "Conductivity calibration overwritten", type = "success", timer = 2000, immediate = TRUE)
-      } else {
-        shinyalert::shinyalert(title = "Conductivity calibration saved", type = "success", timer = 2000, immediate = TRUE)
-      }
-      if (send_table$saved[1,1] == "Nothing saved yet") {
-        send_table$saved[1,1] <- "Conductivity calibration"
-      } else if (!("Conductivity calibration" %in% send_table$saved[ ,1])) {
-        send_table$saved[nrow(send_table$saved) + 1, 1] <- "Conductivity calibration"
-      }
-      output$saved <- renderTable({ # Display local calibrations table
-        send_table$saved
-      })
     }
   }, ignoreInit = TRUE)
 
   observeEvent(input$delete_SpC, {
-    shinyalert::shinyalert("Deleting...", type = "info")
     DBI::dbExecute(pool, paste0("DELETE FROM calibrate_specific_conductance WHERE calibration_id = ", calibration_data$next_id))
     #reset the fields
     reset_spc()
@@ -2614,7 +2637,6 @@ observeEvent(validation_check$orp, {
   }, ignoreInit = TRUE)
 
   observeEvent(input$delete_turb, {
-    shinyalert::shinyalert("Deleting...", type = "info")
     DBI::dbExecute(pool, paste0("DELETE FROM calibrate_turbidity WHERE calibration_id = ", calibration_data$next_id))
     #reset the fields
     reset_turb()
@@ -2717,7 +2739,6 @@ observeEvent(validation_check$orp, {
   }, ignoreInit = TRUE)
 
   observeEvent(input$delete_DO, {
-    shinyalert::shinyalert("Deleting...", type = "info")
     DBI::dbExecute(pool, paste0("DELETE FROM calibrate_dissolved_oxygen WHERE calibration_id = ", calibration_data$next_id))
     #reset the fields
     reset_do()
@@ -2805,7 +2826,6 @@ observeEvent(validation_check$depth, {
   }, ignoreInit = TRUE)
 
   observeEvent(input$delete_depth, {
-    shinyalert::shinyalert("Deleting...", type = "info")
     DBI::dbExecute(pool, paste0("DELETE FROM calibrate_depth WHERE calibration_id = ", calibration_data$next_id))
 
     #reset the fields
