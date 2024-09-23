@@ -4,21 +4,25 @@
 \alias{db_create}
 \title{Initial calibration database creation}
 \usage{
-db_create(con = calConnect(), overwrite = FALSE)
+db_create(con = calConnect(), schema = NULL, overwrite = FALSE)
 }
 \arguments{
-\item{con}{A connection to the target database}
+\item{con}{A connection to the target database. Default is the calConnect() function.}
 
-\item{overwrite}{TRUE overwrites the database, if one exists in the same path.}
+\item{schema}{The schema to create the tables in. Default is NULL.}
+
+\item{overwrite}{TRUE overwrites the database, if one exists in the same path. Will not work if schema is not NULL to prevent accidental deletion of data. Default is FALSE.}
 }
 \value{
 New tables in the target postgres database.
 }
 \description{
 #' @description
-\ifelse{html}{\href{https://lifecycle.r-lib.org/articles/stages.html#experimental}{\figure{lifecycle-experimental.svg}{options: alt='[Experimental]'}}}{\strong{[Experimental]}}
+\ifelse{html}{\href{https://lifecycle.r-lib.org/articles/stages.html#deprecated}{\figure{lifecycle-deprecated.svg}{options: alt='[Deprecated]'}}}{\strong{[Deprecated]}}
 }
 \details{
+This creates a stand-alone calibration and instrument maintenance tracking database and was last worked on in September 2024. Further development moved to integrating this database with the AquaCache database.
+
 Populates a postgres database with the necessary tables for the calibration app. A database should be created before using this function, but it can be left empty.
 
 This function will also establish a mapping to the 'hydromet' database, which is used to populate the 'locations' table.

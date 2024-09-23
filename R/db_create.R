@@ -1,14 +1,16 @@
 #' Initial calibration database creation
 #'
 #'#' @description
-#' `r lifecycle::badge("experimental")`
+#' `r lifecycle::badge("deprecated")`
+#'
+#' This creates a stand-alone calibration and instrument maintenance tracking database and was last worked on in September 2024. Further development moved to integrating this database with the AquaCache database.
 #'
 #' Populates a postgres database with the necessary tables for the calibration app. A database should be created before using this function, but it can be left empty.
 #'
 #' This function will also establish a mapping to the 'hydromet' database, which is used to populate the 'locations' table.
 #'
-#' @param con A connection to the target database
-#' @param overwrite TRUE overwrites the database, if one exists in the same path.
+#' @param con A connection to the target database. Default is the calConnect() function.
+#' @param overwrite TRUE overwrites the database, if one exists in the same path. Will not work if schema is not NULL to prevent accidental deletion of data. Default is FALSE.
 #'
 #' @return New tables in the target postgres database.
 #' @export
@@ -128,7 +130,7 @@ DBI::dbExecute(con, "CREATE TABLE observers (
                   instrument_id INTEGER NOT NULL,
                   deployment_start_date DATE NOT NULL,
                   deployment_end_date DATE,
-                  deplyment_location TEXT,
+                  deployment_location TEXT,
                   deployment_purpose TEXT,
                   deployment_notes TEXT,
                   location_id INTEGER NOT NULL,
