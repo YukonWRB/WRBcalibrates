@@ -253,6 +253,7 @@ DBI::dbExecute(con, "COMMENT ON TABLE array_maintenance_changes IS 'This table i
                   obs_datetime TIMESTAMP WITH TIME ZONE NOT NULL,
                   id_sensor_holder INTEGER NOT NULL,
                   id_handheld_meter INTEGER,
+                  purpose TEXT NOT NULL,
                   complete BOOLEAN NOT NULL DEFAULT FALSE,
                   create_datetime TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
                   modify_datetime TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,

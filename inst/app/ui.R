@@ -62,6 +62,7 @@ app_ui <- function(request) {
                 textOutput("instrument_reminder"),
                 uiOutput("ID_sensor_holder"),
                 uiOutput("ID_handheld_meter"),
+                textInput("calibration_purpose", "Calibration purpose", value = ""),
                 actionButton("save_basic_info", "Save this parameter info"),
               ),
               conditionalPanel(

@@ -222,12 +222,14 @@ table.on("click", "tr", function() {
         complete$incomplete <- data.frame("Index" = seq(1, nrow(incomplete_calibrations)),
                                           "Calibrator" = as.vector(incomplete_calibrations$observer_string),
                                           "Date/time UTC" = incomplete_calibrations$obs_datetime,
+                                          "Purpose" = incomplete_calibrations$purpose,
                                           check.names = FALSE)
       } else {
         # Make a data.frame with no calibrations
         complete$incomplete <- data.frame("Index" = 0,
                                           "Calibrator" = "No unsaved calibrations!",
                                           "Date/Time UTC" = "No unsaved calibrations!",
+                                          "Purpose" = "No unsaved calibrations!",
                                           check.names = FALSE)
       }
       restarted$initialized <- TRUE
@@ -1724,6 +1726,7 @@ table.on("click", "tr", function() {
           style = "color: white; background-color: green;"
         )
       })
+      updateTextInput(session, "calibration_purpose", value = calibrations$incomplete_calibrations[restart_value, "purpose"])
       colnames(send_table$saved) <- "Saved calibrations (this session)" #Update the name for clarity since we're restarting a calibration
       output$saved <- renderTable({ # Display local calibrations tables with new name
         send_table$saved
@@ -1761,12 +1764,14 @@ table.on("click", "tr", function() {
       complete$incomplete <- data.frame("Index" = seq(1, nrow(incomplete_calibrations)),
                                         "Calibrator" = as.vector(incomplete_calibrations$observer_string),
                                         "Date/time UTC" = incomplete_calibrations$obs_datetime,
+                                        "Purpose" = incomplete_calibrations$purpose,
                                         check.names = FALSE)
 
       if (nrow(complete$incomplete) == 0) {
         complete$incomplete <- data.frame("Index" = 0,
                                           "Calibrator" = "No unsaved calibrations!",
                                           "Date/time UTC" = "No unsaved calibrations!",
+                                          "Purpose" = "No unsaved calibrations!",
                                           check.names = FALSE)
       }
       output$incomplete_table <- DT::renderDataTable(complete$incomplete, rownames = FALSE, selection = "single")
@@ -1927,21 +1932,26 @@ table.on("click", "tr", function() {
 
       id_sensor_holder <- instruments_data$sheet[instruments_data$sheet$serial_no == input$ID_sensor_holder, "instrument_id"]
       id_handheld_meter <- if (input$ID_handheld_meter == "NA") NA else instruments_data$sheet[instruments_data$sheet$serial_no == input$ID_handheld_meter, "instrument_id"]
+      purpose_text <- if (nchar(input$calibration_purpose) < 1) NA else input$calibration_purpose
 
       calibration_data$basic <- data.frame(observer = input$observer,
                                            obs_datetime = dt,
                                            id_sensor_holder = id_sensor_holder,
                                            id_handheld_meter = id_handheld_meter,
+                                           purpose = purpose_text,
                                            complete = FALSE)
-      if (!complete$basic) {
+      if (!complete$basic) { # New entry
         DBI::dbAppendTable(pool, "calibrations", calibration_data$basic)
         calibration_data$next_id <- DBI::dbGetQuery(pool, "SELECT MAX(calibration_id) FROM calibrations")[[1]]
         complete$basic <- TRUE
-      } else {
+      } else { # Modify an existing entry
         if (is.na(id_handheld_meter)) {
           DBI::dbExecute(pool, paste0("UPDATE calibrations SET observer = '", input$observer, "', obs_datetime = '", dt, "', id_sensor_holder = ", id_sensor_holder, " WHERE calibration_id = ", calibration_data$next_id, ";"))
         } else {
           DBI::dbExecute(pool, paste0("UPDATE calibrations SET observer = '", input$observer, "', obs_datetime = '", dt, "', id_sensor_holder = ", id_sensor_holder,  ", id_handheld_meter = ", id_handheld_meter, " WHERE calibration_id = ", calibration_data$next_id, ";"))
+        }
+        if (!is.na(purpose_text)) {
+          DBI::dbExecute(pool, paste0("UPDATE calibrations SET purpose = '", purpose_text, "' WHERE calibration_id = ", calibration_data$next_id, ";"))
         }
       }
       if ("Basic info" %in% send_table$saved[ ,1] | "Basic info" %in% send_table$restarted_cal[ ,1]) {
