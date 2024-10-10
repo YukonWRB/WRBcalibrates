@@ -52,23 +52,23 @@ table.on("click", "tr", function() {
   complete <- reactiveValues()
   complete$basic <- FALSE
   complete$temperature <- FALSE
-  complete$SpC <- FALSE
-  complete$pH <- FALSE
+  complete$spc <- FALSE
+  complete$ph <- FALSE
   complete$orp <- FALSE
   complete$turbidity <- FALSE
-  complete$DO <- FALSE
+  complete$do <- FALSE
   complete$depth <- FALSE
   reset_check <- reactiveValues(sensors = FALSE)
   initial_instr_table <- reactiveValues(value = TRUE)
 
   ### Hide a bunch of buttons until they can be used
   # Delete buttons to remove a calibration sheet
-  shinyjs::hide("delete_pH")
+  shinyjs::hide("delete_ph")
   shinyjs::hide("delete_turb")
-  shinyjs::hide("delete_SpC")
+  shinyjs::hide("delete_spc")
   shinyjs::hide("delete_temp")
   shinyjs::hide("delete_orp")
-  shinyjs::hide("delete_DO")
+  shinyjs::hide("delete_do")
   shinyjs::hide("delete_depth")
   # Buttons to show sensor information
   shinyjs::hide("sensor1_show")
@@ -110,14 +110,14 @@ table.on("click", "tr", function() {
   shinyjs::hide("restart_table")
 
   # Hide the pH, ORP, and turbidity post-cal fields. They're still in the UI and in the code below in case ever needed, but hidden from view. Their values reflect the standard solution values, though a user could modify the fields if they become visible
-  shinyjs::hide("pH1_post_val")
-  shinyjs::hide("pH2_post_val")
-  shinyjs::hide("pH3_post_val")
-  shinyjs::hide("orp_post_mV")
+  shinyjs::hide("ph1_post_val")
+  shinyjs::hide("ph2_post_val")
+  shinyjs::hide("ph3_post_val")
+  shinyjs::hide("orp_post_mv")
   shinyjs::hide("turb1_post")
   shinyjs::hide("turb2_post")
-  shinyjs::hide("SpC1_post")
-  shinyjs::hide("SpC2_post")
+  shinyjs::hide("spc1_post")
+  shinyjs::hide("spc2_post")
 
   # Get the data from the database, make initial tables, populate UI elements ########################################
   instruments_sheet <- DBI::dbGetQuery(pool, "SELECT i.instrument_id, i.obs_datetime,  CONCAT(observers.observer_first, ' ', observers.observer_last, '(', observers.organization, ')') AS observer, i.holds_replaceable_sensors, i.serial_no, i.asset_tag, i.date_in_service, i.date_purchased, i.retired_by, i.date_retired, instrument_make.make, instrument_model.model, instrument_type.type, i.owner FROM instruments AS i LEFT JOIN instrument_make ON i.make = instrument_make.make_id LEFT JOIN instrument_model ON i.model = instrument_model.model_id LEFT JOIN instrument_type ON i.type = instrument_type.type_id LEFT JOIN observers ON i.observer = observers.observer_id ORDER BY i.instrument_id")
@@ -452,25 +452,25 @@ table.on("click", "tr", function() {
   }, ignoreInit = TRUE, ignoreNULL = TRUE)
 
   # Show/hide post-cal fields for each calibration type ################################################
-  observeEvent(input$show_post_pH, {
-    if ((input$show_post_pH %% 2) == 0) {
-      shinyjs::hide("pH1_post_val")
-      shinyjs::hide("pH2_post_val")
-      shinyjs::hide("pH3_post_val")
-      updateActionButton(session, "show_post_pH", label = "Show post-cal fields")
+  observeEvent(input$show_post_ph, {
+    if ((input$show_post_ph %% 2) == 0) {
+      shinyjs::hide("ph1_post_val")
+      shinyjs::hide("ph2_post_val")
+      shinyjs::hide("ph3_post_val")
+      updateActionButton(session, "show_post_ph", label = "Show post-cal fields")
     } else {
-      shinyjs::show("pH1_post_val")
-      shinyjs::show("pH2_post_val")
-      shinyjs::show("pH3_post_val")
-      updateActionButton(session, "show_post_pH", label = "Hide post-cal fields")
+      shinyjs::show("ph1_post_val")
+      shinyjs::show("ph2_post_val")
+      shinyjs::show("ph3_post_val")
+      updateActionButton(session, "show_post_ph", label = "Hide post-cal fields")
     }
   }, ignoreInit = TRUE)
   observeEvent(input$show_post_orp, {
     if ((input$show_post_orp %% 2) == 0) {
-      shinyjs::hide("orp_post_mV")
+      shinyjs::hide("orp_post_mv")
       updateActionButton(session, "show_post_orp", label = "Show post-cal fields")
     } else {
-      shinyjs::show("orp_post_mV")
+      shinyjs::show("orp_post_mv")
       updateActionButton(session, "show_post_orp", label = "Hide post-cal fields")
     }
   }, ignoreInit = TRUE)
@@ -485,15 +485,15 @@ table.on("click", "tr", function() {
       updateActionButton(session, "show_post_turb", label = "Hide post-cal fields")
     }
   }, ignoreInit = TRUE)
-  observeEvent(input$show_post_SpC, {
-    if ((input$show_post_SpC %% 2) == 0) {
-      shinyjs::hide("SpC1_post")
-      shinyjs::hide("SpC2_post")
-      updateActionButton(session, "show_post_SpC", label = "Show post-cal fields")
+  observeEvent(input$show_post_spc, {
+    if ((input$show_post_spc %% 2) == 0) {
+      shinyjs::hide("spc1_post")
+      shinyjs::hide("spc2_post")
+      updateActionButton(session, "show_post_spc", label = "Show post-cal fields")
     } else {
-      shinyjs::show("SpC1_post")
-      shinyjs::show("SpC2_post")
-      updateActionButton(session, "show_post_SpC", label = "Hide post-cal fields")
+      shinyjs::show("spc1_post")
+      shinyjs::show("spc2_post")
+      updateActionButton(session, "show_post_spc", label = "Hide post-cal fields")
     }
   }, ignoreInit = TRUE)
 
@@ -523,9 +523,9 @@ table.on("click", "tr", function() {
   output$sensor_change_note <- renderUI({
     HTML(messages$sensor_change_note)
   })
-  messages$pH_mV_note <- "<b><br><br>pH mV standards:&nbsp;&nbsp;&nbsp;pH7 = +- 50;&nbsp;&nbsp;&nbsp;pH4 = pH 7 value + 165 to 180;&nbsp;&nbsp;&nbsp;pH 10 = pH 7 value - 165 to 180</b>"
-  output$pH_mV_note <- renderUI({
-    HTML(messages$pH_mV_note)
+  messages$ph_mV_note <- "<b><br><br>pH mV standards:&nbsp;&nbsp;&nbsp;pH7 = +- 50;&nbsp;&nbsp;&nbsp;pH4 = pH 7 value + 165 to 180;&nbsp;&nbsp;&nbsp;pH 10 = pH 7 value - 165 to 180</b>"
+  output$ph_mV_note <- renderUI({
+    HTML(messages$ph_mV_note)
   })
   messages$ORP_molarity_note <- "<b><br><br>If using combination pH/ORP electrode adjust pH first.<br><br>Use proper standard scale: YSI Pro Series use 3.5M KCl scale, YSI sondes use 4M KCl scale.</b>"
   output$ORP_molarity_note <- renderUI({
@@ -544,9 +544,9 @@ table.on("click", "tr", function() {
       shinyjs::hide("calibration_instruments_table")
     }
     if (input$selection == "pH calibration" & input$first_selection == "Calibrate") {
-      shinyjs::show("pH_mV_note")
+      shinyjs::show("ph_mV_note")
     } else {
-      shinyjs::hide("pH_mV_note")
+      shinyjs::hide("ph_mV_note")
     }
     if (input$selection == "ORP calibration" & input$first_selection == "Calibrate") {
       shinyjs::show("ORP_molarity_note")
@@ -577,19 +577,19 @@ table.on("click", "tr", function() {
     })
   }
   reset_ph <- function() {
-    updateNumericInput(session, "pH1_std", label = "Low pH solution value", value = "4")
-    updateNumericInput(session, "pH2_std", label = "Neutral pH solution value", value = "7")
-    updateNumericInput(session, "pH3_std", label = "High pH solution value", value = "10")
-    updateNumericInput(session, "pH1_pre_val", label = "pH 4 Pre-Cal Value", value = "")
-    updateNumericInput(session, "pH2_pre_val", label = "pH 7 Pre-Cal Value", value = "")
-    updateNumericInput(session, "pH3_pre_val", label = "pH 10 Pre-Cal Value", value = "")
-    updateNumericInput(session, "pH1_post_val", label = "pH 4 Post-Cal Value", value = "4")
-    updateNumericInput(session, "pH1_mV", label = "pH 4 Post-Cal mV", value = "")
-    updateNumericInput(session, "pH2_post_val", label = "pH 7 Post-Cal Value", value = "7")
-    updateNumericInput(session, "pH2_mV", label = "pH 7 Post-Cal mV", value = "")
-    updateNumericInput(session, "pH3_post_val", label = "pH 10 Post-Cal Value", value = "10")
-    updateNumericInput(session, "pH3_mV", label = "pH 10 Post-Cal mV", value = "")
-    shinyjs::hide("delete_pH")
+    updateNumericInput(session, "ph1_std", label = "Low pH solution value", value = "4")
+    updateNumericInput(session, "ph2_std", label = "Neutral pH solution value", value = "7")
+    updateNumericInput(session, "ph3_std", label = "High pH solution value", value = "10")
+    updateNumericInput(session, "ph1_pre_val", label = "pH 4 Pre-Cal Value", value = "")
+    updateNumericInput(session, "ph2_pre_val", label = "pH 7 Pre-Cal Value", value = "")
+    updateNumericInput(session, "ph3_pre_val", label = "pH 10 Pre-Cal Value", value = "")
+    updateNumericInput(session, "ph1_post_val", label = "pH 4 Post-Cal Value", value = "4")
+    updateNumericInput(session, "ph1_mv", label = "pH 4 Post-Cal mV", value = "")
+    updateNumericInput(session, "ph2_post_val", label = "pH 7 Post-Cal Value", value = "7")
+    updateNumericInput(session, "ph2_mv", label = "pH 7 Post-Cal mV", value = "")
+    updateNumericInput(session, "ph3_post_val", label = "pH 10 Post-Cal Value", value = "10")
+    updateNumericInput(session, "ph3_mv", label = "pH 10 Post-Cal mV", value = "")
+    shinyjs::hide("delete_ph")
   }
   reset_temp <- function() {
     updateTextInput(session, "temp_reference_desc", label = "Temp Reference Type", value = "Lab thermometer")
@@ -599,18 +599,18 @@ table.on("click", "tr", function() {
   }
   reset_orp <- function() {
     updateNumericInput(session, "orp_std", label = "ORP Standard solution mV", value = "")
-    updateNumericInput(session, "orp_pre_mV", label = "ORP mV Pre-Cal Value", value = "")
-    updateNumericInput(session, "orp_post_mV", label = "ORP mV Post-Cal Value", value = "")
+    updateNumericInput(session, "orp_pre_mv", label = "ORP mV Pre-Cal Value", value = "")
+    updateNumericInput(session, "orp_post_mv", label = "ORP mV Post-Cal Value", value = "")
     shinyjs::hide("delete_orp")
   }
   reset_spc <- function() {
-    updateNumericInput(session, "SpC1_std", label = "SpC Low-Range Standard", value = "0")
-    updateNumericInput(session, "SpC1_pre", label = "SpC Low-Range Pre-Cal Value", value = "")
-    updateNumericInput(session, "SpC1_post", label = "SpC Low-Range Post-Cal Value", value = "0")
-    updateNumericInput(session, "SpC2_std", label = "SpC High-Range Standard", value = "1413")
-    updateNumericInput(session, "SpC2_pre", label = "SpC High-Range Pre-Cal Value", value = "")
-    updateNumericInput(session, "SpC2_post", label = "SpC High-Range Post-Cal Value", value = "1413")
-    shinyjs::hide("delete_SpC")
+    updateNumericInput(session, "spc1_std", label = "SpC Low-Range Standard", value = "0")
+    updateNumericInput(session, "spc1_pre", label = "SpC Low-Range Pre-Cal Value", value = "")
+    updateNumericInput(session, "spc1_post", label = "SpC Low-Range Post-Cal Value", value = "0")
+    updateNumericInput(session, "spc2_std", label = "SpC High-Range Standard", value = "1413")
+    updateNumericInput(session, "spc2_pre", label = "SpC High-Range Pre-Cal Value", value = "")
+    updateNumericInput(session, "spc2_post", label = "SpC High-Range Post-Cal Value", value = "1413")
+    shinyjs::hide("delete_spc")
   }
   reset_turb <- function() {
     updateNumericInput(session, "turb1_std", label = "Low Turb Standard Value", value = "0")
@@ -624,11 +624,11 @@ table.on("click", "tr", function() {
   reset_do <- function() {
     updateNumericInput(session, "baro_press_pre", label = "Baro Pressure Pre-Cal", value = "")
     updateNumericInput(session, "baro_press_post", label = "Baro Pressure Post-Cal", value = "")
-    updateNumericInput(session, "DO_pre_prct", label = "DO Pre-Cal %", value = "")
-    updateNumericInput(session, "DO_post_prct", label = "DO Post-Cal %", value = "")
-    updateNumericInput(session, "DO_pre", label = "DO Pre-Cal mg/L", value = "")
-    updateNumericInput(session, "DO_post", label = "DO Post-Cal mg/L", value = "")
-    shinyjs::hide("delete_DO")
+    updateNumericInput(session, "do_pre_prct", label = "DO Pre-Cal %", value = "")
+    updateNumericInput(session, "do_post_prct", label = "DO Post-Cal %", value = "")
+    updateNumericInput(session, "do_pre", label = "DO Pre-Cal mg/L", value = "")
+    updateNumericInput(session, "do_post", label = "DO Post-Cal mg/L", value = "")
+    shinyjs::hide("delete_do")
   }
   reset_depth <- function() {
     updateRadioButtons(session, inputId = "depth_check_ok", selected = "FALSE")
@@ -822,23 +822,23 @@ table.on("click", "tr", function() {
 
 
   # Update pH and ORP fields based on standard solution selected ###################################
-  observeEvent(input$pH1_std, {
-    updateNumericInput(session, "pH1_pre_val", label = paste0("pH ", input$pH1_std, " Pre-Cal Value"))
-    updateNumericInput(session, "pH1_mV", label = paste0("pH ", input$pH1_std, " mV"))
-    updateNumericInput(session, "pH1_post_val", label = paste0("pH ", input$pH1_std, " Post-Cal Value"), value = input$pH1_std)
+  observeEvent(input$ph1_std, {
+    updateNumericInput(session, "ph1_pre_val", label = paste0("pH ", input$ph1_std, " Pre-Cal Value"))
+    updateNumericInput(session, "ph1_mv", label = paste0("pH ", input$ph1_std, " mV"))
+    updateNumericInput(session, "ph1_post_val", label = paste0("pH ", input$ph1_std, " Post-Cal Value"), value = input$ph1_std)
   }, ignoreInit = TRUE)
-  observeEvent(input$pH2_std, {
-    updateNumericInput(session, "pH2_pre_val", label = paste0("pH ", input$pH2_std, " Pre-Cal Value"))
-    updateNumericInput(session, "pH2_mV", label = paste0("pH ", input$pH2_std, " mV"))
-    updateNumericInput(session, "pH2_post_val", label = paste0("pH ", input$pH2_std, " Post-Cal Value"), value = input$pH2_std)
+  observeEvent(input$ph2_std, {
+    updateNumericInput(session, "ph2_pre_val", label = paste0("pH ", input$ph2_std, " Pre-Cal Value"))
+    updateNumericInput(session, "ph2_mv", label = paste0("pH ", input$ph2_std, " mV"))
+    updateNumericInput(session, "ph2_post_val", label = paste0("pH ", input$ph2_std, " Post-Cal Value"), value = input$ph2_std)
   }, ignoreInit = TRUE)
-  observeEvent(input$pH3_std, {
-    updateNumericInput(session, "pH3_pre_val", label = paste0("pH ", input$pH3_std, " Pre-Cal Value"))
-    updateNumericInput(session, "pH3_mV", label = paste0("pH ", input$pH3_std, " mV"))
-    updateNumericInput(session, "pH3_post_val", label = paste0("pH ", input$pH3_std, " Post-Cal Value"), value = input$pH3_std)
+  observeEvent(input$ph3_std, {
+    updateNumericInput(session, "ph3_pre_val", label = paste0("pH ", input$ph3_std, " Pre-Cal Value"))
+    updateNumericInput(session, "ph3_mv", label = paste0("pH ", input$ph3_std, " mV"))
+    updateNumericInput(session, "ph3_post_val", label = paste0("pH ", input$ph3_std, " Post-Cal Value"), value = input$ph3_std)
   }, ignoreInit = TRUE)
   observeEvent(input$orp_std, {
-    updateNumericInput(session, "orp_post_mV", value = input$orp_std)
+    updateNumericInput(session, "orp_post_mv", value = input$orp_std)
   }, ignoreInit = TRUE)
   observeEvent(input$turb1_std, {
     updateNumericInput(session, "turb1_post", value = input$turb1_std)
@@ -846,11 +846,11 @@ table.on("click", "tr", function() {
   observeEvent(input$turb2_std, {
     updateNumericInput(session, "turb2_post", value = input$turb2_std)
   }, ignoreInit = TRUE)
-  observeEvent(input$SpC1_std, {
-    updateNumericInput(session, "SpC1_post", value = input$SpC1_std)
+  observeEvent(input$spc1_std, {
+    updateNumericInput(session, "spc1_post", value = input$spc1_std)
   }, ignoreInit = TRUE)
-  observeEvent(input$SpC2_std, {
-    updateNumericInput(session, "SpC2_post", value = input$SpC2_std)
+  observeEvent(input$spc2_std, {
+    updateNumericInput(session, "spc2_post", value = input$spc2_std)
   }, ignoreInit = TRUE)
 
   #observeEvents for when the user selects a particular page ########################################
@@ -1638,40 +1638,40 @@ table.on("click", "tr", function() {
             complete$temperature <- TRUE
             updateTextInput(session, "temp_reference_desc", value = sheet$temp_reference_desc)
             updateNumericInput(session, "temp_reference", value = sheet$temp_reference)
-            updateNumericInput(session, "temp_observed", value = sheet$temp_reference)
+            updateNumericInput(session, "temp_observed", value = sheet$temp_observed)
             shinyjs::show("delete_temp")
           } else if (i == "calibrate_specific_conductance") {
             output_name <- "Conductivity calibration"
-            complete$SpC <- TRUE
-            updateNumericInput(session, "SpC1_std", value = sheet$SpC1_std)
-            updateNumericInput(session, "SpC1_pre", value = sheet$SpC1_pre)
-            updateNumericInput(session, "SpC1_post", value = sheet$SpC1_post)
-            updateNumericInput(session, "SpC2_std", value = sheet$SpC2_std)
-            updateNumericInput(session, "SpC2_pre", value = sheet$SpC2_pre)
-            updateNumericInput(session, "SpC2_post", value = sheet$SpC2_post)
-            shinyjs::show("delete_SpC")
+            complete$spc <- TRUE
+            updateNumericInput(session, "spc1_std", value = sheet$spc1_std)
+            updateNumericInput(session, "spc1_pre", value = sheet$spc1_pre)
+            updateNumericInput(session, "spc1_post", value = sheet$spc1_post)
+            updateNumericInput(session, "spc2_std", value = sheet$spc2_std)
+            updateNumericInput(session, "spc2_pre", value = sheet$spc2_pre)
+            updateNumericInput(session, "spc2_post", value = sheet$spc2_post)
+            shinyjs::show("delete_spc")
           } else if (i == "calibrate_ph") {
             output_name <- "pH calibration"
-            complete$pH <- TRUE
-            updateNumericInput(session, "pH1_std", value = sheet$pH1_std)
-            updateNumericInput(session, "pH2_std", value = sheet$pH2_std)
-            updateNumericInput(session, "pH3_std", value = sheet$pH3_std)
-            updateNumericInput(session, "pH1_pre_val", label = paste0("pH ", sheet$pH1_std, " Pre-Cal Value"), value =  sheet$pH1_pre_val)
-            updateNumericInput(session, "pH1_mV", label = paste0("pH ", sheet$pH1_std, " mV"), value = sheet$pH1_mV)
-            updateNumericInput(session, "pH2_pre_val", label = paste0("pH ", sheet$pH2_std, " Pre-Cal Value"), value = sheet$pH2_pre_val)
-            updateNumericInput(session, "pH2_mV", label = paste0("pH ", sheet$pH2_std, " mV"), value = sheet$pH2_mV)
-            updateNumericInput(session, "pH3_pre_val", label = paste0("pH ", sheet$pH3_std, " Pre-Cal Value"), value = sheet$pH3_pre_val)
-            updateNumericInput(session, "pH3_mV", label = paste0("pH ", sheet$pH3_std, " mV"), value = sheet$pH3_mV)
-            updateNumericInput(session, "pH1_post_val", label = paste0("pH ", sheet$pH1_std, " Post-Cal Value"), value = sheet$pH1_post_val)
-            updateNumericInput(session, "pH2_post_val", label = paste0("pH ", sheet$pH2_std, " Post-Cal Value"), value = sheet$pH2_post_val)
-            updateNumericInput(session, "pH3_post_val", label = paste0("pH ", sheet$pH3_std, " Post-Cal Value"), value = sheet$pH3_post_val)
-            shinyjs::show("delete_pH")
+            complete$ph <- TRUE
+            updateNumericInput(session, "ph1_std", value = sheet$ph1_std)
+            updateNumericInput(session, "ph2_std", value = sheet$ph2_std)
+            updateNumericInput(session, "ph3_std", value = sheet$ph3_std)
+            updateNumericInput(session, "ph1_pre_val", label = paste0("pH ", sheet$ph1_std, " Pre-Cal Value"), value =  sheet$ph1_pre_val)
+            updateNumericInput(session, "ph1_mv", label = paste0("pH ", sheet$ph1_std, " mV"), value = sheet$ph1_mv)
+            updateNumericInput(session, "ph2_pre_val", label = paste0("pH ", sheet$ph2_std, " Pre-Cal Value"), value = sheet$ph2_pre_val)
+            updateNumericInput(session, "ph2_mv", label = paste0("pH ", sheet$ph2_std, " mV"), value = sheet$ph2_mv)
+            updateNumericInput(session, "ph3_pre_val", label = paste0("pH ", sheet$ph3_std, " Pre-Cal Value"), value = sheet$ph3_pre_val)
+            updateNumericInput(session, "ph3_mv", label = paste0("pH ", sheet$ph3_std, " mV"), value = sheet$ph3_mv)
+            updateNumericInput(session, "ph1_post_val", label = paste0("pH ", sheet$ph1_std, " Post-Cal Value"), value = sheet$ph1_post_val)
+            updateNumericInput(session, "ph2_post_val", label = paste0("pH ", sheet$ph2_std, " Post-Cal Value"), value = sheet$ph2_post_val)
+            updateNumericInput(session, "ph3_post_val", label = paste0("pH ", sheet$ph3_std, " Post-Cal Value"), value = sheet$ph3_post_val)
+            shinyjs::show("delete_ph")
           } else if (i == "calibrate_orp") {
             output_name <- "ORP calibration"
             complete$orp <- TRUE
             updateNumericInput(session, "orp_std", value = sheet$orp_std)
-            updateNumericInput(session, "orp_pre_mV", value = sheet$orp_pre_mV)
-            updateNumericInput(session, "orp_post_mV", value = sheet$orp_post_mV)
+            updateNumericInput(session, "orp_pre_mv", value = sheet$orp_pre_mv)
+            updateNumericInput(session, "orp_post_mv", value = sheet$orp_post_mv)
             shinyjs::show("delete_orp")
           } else if (i == "calibrate_turbidity") {
             output_name <- "Turbidity calibration"
@@ -1685,12 +1685,12 @@ table.on("click", "tr", function() {
             shinyjs::show("delete_turb")
           } else if (i == "calibrate_dissolved_oxygen") {
             output_name <- "DO calibration"
-            complete$DO <- TRUE
+            complete$do <- TRUE
             updateNumericInput(session, "baro_press_pre", value = sheet$baro_press_pre)
             updateNumericInput(session, "baro_press_post", value = sheet$baro_press_post)
-            updateNumericInput(session, "DO_pre", value = sheet$DO_pre_mgl)
-            updateNumericInput(session, "DO_post", value = sheet$DO_post_mgl)
-            shinyjs::show("delete_DO")
+            updateNumericInput(session, "do_pre", value = sheet$do_pre_mgl)
+            updateNumericInput(session, "do_post", value = sheet$do_post_mgl)
+            shinyjs::show("delete_do")
           } else if (i == "calibrate_depth") {
             output_name <- "Depth calibration"
             complete$depth <- TRUE
@@ -1735,7 +1735,7 @@ table.on("click", "tr", function() {
         send_table$restarted_cal
       })
       restarted$restarted <- TRUE
-      updateCheckboxInput(session, "spc_or_not", value = FALSE) #Reset to FALSE since values are stored as SpC; this makes it clear to the user.
+      updateCheckboxInput(session, "spc_or_not", value = FALSE) #Reset to FALSE since values are stored as spc; this makes it clear to the user.
       updateSelectizeInput(session, "first_selection", selected = "Calibrate") # Changing this selection brings the user right to the calibration page
     }
   }, ignoreInit = TRUE)
@@ -1781,11 +1781,11 @@ table.on("click", "tr", function() {
       #reset internal markers of completeness
       complete$basic <- FALSE
       complete$temperature <- FALSE
-      complete$SpC <- FALSE
-      complete$pH <- FALSE
+      complete$spc <- FALSE
+      complete$ph <- FALSE
       complete$orp <- FALSE
       complete$turbidity <- FALSE
-      complete$DO <- FALSE
+      complete$do <- FALSE
       complete$depth <- FALSE
       # reset fields previously loaded if loaded calibration is the one being deleted
       if (delete_ID == calibration_data$restarted_id) {
@@ -1803,34 +1803,34 @@ table.on("click", "tr", function() {
   }, ignoreInit = TRUE)
 
 
-  # Update the SpC and DO fields ##########################################
+  # Update the spc and DO fields ##########################################
   observeEvent(input$spc_or_not, {
     if (input$spc_or_not) {
-      updateNumericInput(session, "SpC1_pre", label = "Conductivity Low-Range Pre-Cal Value")
-      updateNumericInput(session, "SpC1_post", label = "Conductivity Low-Range Post-Cal Value")
-      updateNumericInput(session, "SpC2_pre", label = "Conductivity High-Range Pre-Cal Value")
-      updateNumericInput(session, "SpC2_post", label = "Conductivity High-Range Post-Cal Value")
+      updateNumericInput(session, "spc1_pre", label = "Conductivity Low-Range Pre-Cal Value")
+      updateNumericInput(session, "spc1_post", label = "Conductivity Low-Range Post-Cal Value")
+      updateNumericInput(session, "spc2_pre", label = "Conductivity High-Range Pre-Cal Value")
+      updateNumericInput(session, "spc2_post", label = "Conductivity High-Range Post-Cal Value")
     } else {
-      updateNumericInput(session, "SpC1_pre", label = "SpC Low-Range Pre-Cal Value")
-      updateNumericInput(session, "SpC1_post", label = "SpC Low-Range Post-Cal Value")
-      updateNumericInput(session, "SpC2_pre", label = "SpC High-Range Pre-Cal Value")
-      updateNumericInput(session, "SpC2_post", label = "SpC High-Range Post-Cal Value")
+      updateNumericInput(session, "spc1_pre", label = "SpC Low-Range Pre-Cal Value")
+      updateNumericInput(session, "spc1_post", label = "SpC Low-Range Post-Cal Value")
+      updateNumericInput(session, "spc2_pre", label = "SpC High-Range Pre-Cal Value")
+      updateNumericInput(session, "spc2_post", label = "SpC High-Range Post-Cal Value")
     }
   }, ignoreInit = TRUE)
 
   observe( #Updates the SPC or non-spc values based on reference temperature input$spc_or_not changing
     if (input$spc_or_not) {
-      post_condy_val <- input$SpC2_std/(1 + 0.02 * (calibration_data$temp$temp_reference - 25))
-      updateNumericInput(session, "SpC2_post", value = round(post_condy_val, 0))
+      post_condy_val <- input$spc2_std/(1 + 0.02 * (calibration_data$temp$temp_reference - 25))
+      updateNumericInput(session, "spc2_post", value = round(post_condy_val, 0))
     } else {
-      updateNumericInput(session, "SpC2_post", value = input$SpC2_std)
+      updateNumericInput(session, "spc2_post", value = input$spc2_std)
     }
   )
 
   #Function to simplify DO calculated fields later on
   DO_calc <- function(pre_post, prct_abs, messages = TRUE) {
-    trigger_name <- if (pre_post == "pre" & prct_abs == "prct") "DO_pre_prct" else if (pre_post == "pre" & prct_abs == "abs") "DO_pre" else if (pre_post == "post" & prct_abs == "prct") "DO_post_prct" else if (pre_post == "post" & prct_abs == "abs") "DO_post"
-    update_name <- if (pre_post == "pre" & prct_abs == "prct") "DO_pre" else if (pre_post == "pre" & prct_abs == "abs") "DO_pre_prct" else if (pre_post == "post" & prct_abs == "prct") "DO_post" else if (pre_post == "post" & prct_abs == "abs") "DO_post_prct"
+    trigger_name <- if (pre_post == "pre" & prct_abs == "prct") "do_pre_prct" else if (pre_post == "pre" & prct_abs == "abs") "do_pre" else if (pre_post == "post" & prct_abs == "prct") "do_post_prct" else if (pre_post == "post" & prct_abs == "abs") "do_post"
+    update_name <- if (pre_post == "pre" & prct_abs == "prct") "do_pre" else if (pre_post == "pre" & prct_abs == "abs") "do_pre_prct" else if (pre_post == "post" & prct_abs == "prct") "do_post" else if (pre_post == "post" & prct_abs == "abs") "do_post_prct"
     baro_press <- if (pre_post == "pre") input$baro_press_pre else input$baro_press_post
     meas <- input[[trigger_name]]
     temp <- input$temp_observed
@@ -1873,16 +1873,16 @@ table.on("click", "tr", function() {
       if (messages) {
         shinyalert::shinyalert("You MUST recalculate if updating baro pressures or temperature", "Cannot auto-update without knowing which value (mg/l or %) to update", timer = 4000)
       }
-      updateActionButton(session, "calc_abs_DO", "Recalc mg/l values")
-      updateActionButton(session, "calc_prct_DO", "Recalc % values")
+      updateActionButton(session, "calc_abs_do", "Recalc mg/l values")
+      updateActionButton(session, "calc_prct_do", "Recalc % values")
     }
   }
 
-  observeEvent(input$calc_abs_DO, {
+  observeEvent(input$calc_abs_do, {
     DO_calc(pre_post = "pre", prct_abs = "prct")
     DO_calc(pre_post = "post", prct_abs = "prct", messages = FALSE)
   }, ignoreInit = T)
-  observeEvent(input$calc_prct_DO, {
+  observeEvent(input$calc_prct_do, {
     DO_calc(pre_post = "pre", prct_abs = "abs")
     DO_calc(pre_post = "post", prct_abs = "abs", messages = FALSE)
   }, ignoreInit = T)
@@ -1970,86 +1970,86 @@ table.on("click", "tr", function() {
   }, ignoreInit = TRUE)
 
   ## Validate/Save/Delete pH ##############################################################################
-  observeEvent(input$save_cal_pH, {
-    validation_check$pH <- FALSE
+  observeEvent(input$save_cal_ph, {
+    validation_check$ph <- FALSE
       tryCatch({
         #Check the standard values entered
-        std1 <- as.numeric(input$pH1_std)
-        std2 <- as.numeric(input$pH2_std)
-        std3 <- as.numeric(input$pH3_std)
+        std1 <- as.numeric(input$ph1_std)
+        std2 <- as.numeric(input$ph2_std)
+        std3 <- as.numeric(input$ph3_std)
         warn_ph_std <- FALSE
         warn_ph_post <- FALSE
         warn_mv_post <- FALSE
         if (std1 != 4) {
-          shinyjs::js$backgroundCol("pH1_std", "lemonchiffon")
+          shinyjs::js$backgroundCol("ph1_std", "lemonchiffon")
           warn_ph_std <- TRUE
         } else {
-          shinyjs::js$backgroundCol("pH1_std", "white")
+          shinyjs::js$backgroundCol("ph1_std", "white")
           warn_ph_std <- FALSE
         }
         if (std2 != 7) {
-          shinyjs::js$backgroundCol("pH2_std", "lemonchiffon")
+          shinyjs::js$backgroundCol("ph2_std", "lemonchiffon")
           warn_ph_std <- TRUE
         } else {
-          shinyjs::js$backgroundCol("pH2_std", "white")
+          shinyjs::js$backgroundCol("ph2_std", "white")
           warn_ph_std <- FALSE
         }
         if (std3 != 10) {
-          shinyjs::js$backgroundCol("pH3_std", "lemonchiffon")
+          shinyjs::js$backgroundCol("ph3_std", "lemonchiffon")
           warn_ph_std <- TRUE
         } else {
-          shinyjs::js$backgroundCol("pH3_std", "white")
+          shinyjs::js$backgroundCol("ph3_std", "white")
           warn_ph_std <- FALSE
         }
         #Validate the pH measurements vs the standards
-        value1 <- as.numeric(input$pH1_post_val)
+        value1 <- as.numeric(input$ph1_post_val)
         if (value1 < (std1 - 0.1) | value1 > (std1 + 0.1) | is.null(value1)) { #tolerance of 0.1 pH units from the stated calibration standard value
-          shinyjs::js$backgroundCol("pH1_post_val", "red")
+          shinyjs::js$backgroundCol("ph1_post_val", "red")
           warn_ph_post <- TRUE
         } else {
-          shinyjs::js$backgroundCol("pH1_post_val", "white")
+          shinyjs::js$backgroundCol("ph1_post_val", "white")
         }
-        value2 <- as.numeric(input$pH2_post_val)
+        value2 <- as.numeric(input$ph2_post_val)
         if (value2 < (std2 - 0.1) | value2 > (std2 + 0.1) | is.null(value2)) { #tolerance of 0.1 pH units from the stated calibration standard value
-          shinyjs::js$backgroundCol("pH2_post_val", "red")
+          shinyjs::js$backgroundCol("ph2_post_val", "red")
           warn_ph_post <- TRUE
         } else {
-          shinyjs::js$backgroundCol("pH2_post_val", "white")
+          shinyjs::js$backgroundCol("ph2_post_val", "white")
         }
-        value3 <- as.numeric(input$pH3_post_val)
+        value3 <- as.numeric(input$ph3_post_val)
         if (value3 < (std3 - 0.1) | value3 > (std3 + 0.1) | is.null(value3)) { #tolerance of 0.1 pH units from the stated calibration standard value
-          shinyjs::js$backgroundCol("pH3_post_val", "red")
+          shinyjs::js$backgroundCol("ph3_post_val", "red")
           warn_ph_post <- TRUE
         } else {
-          shinyjs::js$backgroundCol("pH3_post_val", "white")
+          shinyjs::js$backgroundCol("ph3_post_val", "white")
         }
         # Validate the mV readings
-        pH1_mV <- as.numeric(input$pH1_mV)
-        pH2_mV <- as.numeric(input$pH2_mV)
-        pH3_mV <- as.numeric(input$pH3_mV)
-        if ((pH1_mV < (165 + pH2_mV)) | (pH1_mV > (180 + pH2_mV)) & (std1 > 3.9 & std1 < 4.1)) {
-          shinyjs::js$backgroundCol("pH1_mV", "red")
+        ph1_mv <- as.numeric(input$ph1_mv)
+        ph2_mv <- as.numeric(input$ph2_mv)
+        ph3_mv <- as.numeric(input$ph3_mv)
+        if ((ph1_mv < (165 + ph2_mv)) | (ph1_mv > (180 + ph2_mv)) & (std1 > 3.9 & std1 < 4.1)) {
+          shinyjs::js$backgroundCol("ph1_mv", "red")
           warn_mv_post <- TRUE
         } else if (std1 != 4) {
-          shinyjs::js$backgroundCol("pH1_mV", "lemonchiffon")
+          shinyjs::js$backgroundCol("ph1_mv", "lemonchiffon")
         } else {
-          shinyjs::js$backgroundCol("pH1_mV", "white")
+          shinyjs::js$backgroundCol("ph1_mv", "white")
         }
-        if ((pH2_mV > 50 | pH2_mV < -50) & (std2 > 6.9 & std2 < 7.1)) {
-          shinyjs::js$backgroundCol("pH2_mV", "red")
+        if ((ph2_mv > 50 | ph2_mv < -50) & (std2 > 6.9 & std2 < 7.1)) {
+          shinyjs::js$backgroundCol("ph2_mv", "red")
           warn_mv_post <- TRUE
         } else if (std2 != 7) {
-          shinyjs::js$backgroundCol("pH2_mV", "lemonchiffon")
+          shinyjs::js$backgroundCol("ph2_mv", "lemonchiffon")
         } else {
-          shinyjs::js$backgroundCol("pH2_mV", "white")
+          shinyjs::js$backgroundCol("ph2_mv", "white")
         }
-        if ((pH3_mV > (pH2_mV - 165)) | (pH3_mV < (pH2_mV - 180)) & (std3 > 9.9 & std3 < 10.1)) {
-          shinyjs::js$backgroundCol("pH3_mV", "red")
+        if ((ph3_mv > (ph2_mv - 165)) | (ph3_mv < (ph2_mv - 180)) & (std3 > 9.9 & std3 < 10.1)) {
+          shinyjs::js$backgroundCol("ph3_mv", "red")
           warn_mv_post <- TRUE
         } else if (std3 != 10) {
-          shinyjs::js$backgroundCol("pH3_mV", "lemonchiffon")
+          shinyjs::js$backgroundCol("ph3_mv", "lemonchiffon")
         } else {
-          shinyjs::js$backgroundCol("pH3_mV", "white")
+          shinyjs::js$backgroundCol("ph3_mv", "white")
         }
         if (warn_ph_std | warn_ph_post | warn_mv_post) {
           warnings <- paste0(
@@ -2067,7 +2067,7 @@ table.on("click", "tr", function() {
             )
           ))
         } else {
-          validation_check$pH <- TRUE
+          validation_check$ph <- TRUE
         }
       }, error = function(e) {
         shinyalert::shinyalert(title = "You have unfilled mandatory entries", text = "If doing a 2-point calibration enter 0 for the third solution values to pass this check.", type = "error")
@@ -2076,44 +2076,44 @@ table.on("click", "tr", function() {
 
   observeEvent(input$ok_check_ph, {
     removeModal()
-    validation_check$pH <- TRUE
+    validation_check$ph <- TRUE
   }, ignoreInit = TRUE)
 
-observeEvent(validation_check$pH, {
-    if (!validation_check$pH) {
+observeEvent(validation_check$ph, {
+    if (!validation_check$ph) {
       return()
     } else {
-      calibration_data$pH <- data.frame(calibration_id = calibration_data$next_id,
-                                        ph1_std = input$pH1_std,
-                                        ph2_std = input$pH2_std,
-                                        ph3_std = input$pH3_std,
-                                        ph1_pre_val = input$pH1_pre_val,
-                                        ph2_pre_val = input$pH2_pre_val,
-                                        ph3_pre_val = input$pH3_pre_val,
-                                        ph1_mv = input$pH1_mV,
-                                        ph2_mv = input$pH2_mV,
-                                        ph3_mv = input$pH3_mV,
-                                        ph1_post_val = input$pH1_post_val,
-                                        ph2_post_val = input$pH2_post_val,
-                                        ph3_post_val = input$pH3_post_val)
-      if (!complete$pH) {
-        DBI::dbAppendTable(pool, "calibrate_ph", calibration_data$pH)
+      calibration_data$ph <- data.frame(calibration_id = calibration_data$next_id,
+                                        ph1_std = input$ph1_std,
+                                        ph2_std = input$ph2_std,
+                                        ph3_std = input$ph3_std,
+                                        ph1_pre_val = input$ph1_pre_val,
+                                        ph2_pre_val = input$ph2_pre_val,
+                                        ph3_pre_val = input$ph3_pre_val,
+                                        ph1_mv = input$ph1_mv,
+                                        ph2_mv = input$ph2_mv,
+                                        ph3_mv = input$ph3_mv,
+                                        ph1_post_val = input$ph1_post_val,
+                                        ph2_post_val = input$ph2_post_val,
+                                        ph3_post_val = input$ph3_post_val)
+      if (!complete$ph) {
+        DBI::dbAppendTable(pool, "calibrate_ph", calibration_data$ph)
 
-        complete$pH <- TRUE
-        shinyjs::show("delete_pH")
+        complete$ph <- TRUE
+        shinyjs::show("delete_ph")
       } else {
-        DBI::dbExecute(pool, paste0("UPDATE calibrate_ph SET ph1_std = ", input$pH1_std,
-                                    ", ph2_std = ", input$pH2_std,
-                                    ", ph3_std = ", input$pH3_std,
-                                    ", ph1_pre_val = ", input$pH1_pre_val,
-                                    ", ph2_pre_val = ", input$pH2_pre_val,
-                                    ", ph3_pre_val = ", input$pH3_pre_val,
-                                    ", ph1_mv = ", input$pH1_mV,
-                                    ", ph2_mv = ", input$pH2_mV,
-                                    ", ph3_mv = ", input$pH3_mV,
-                                    ", ph1_post_val = ", input$pH1_post_val,
-                                    ", ph2_post_val = ", input$pH2_post_val,
-                                    ", ph3_post_val = ", input$pH3_post_val,
+        DBI::dbExecute(pool, paste0("UPDATE calibrate_ph SET ph1_std = ", input$ph1_std,
+                                    ", ph2_std = ", input$ph2_std,
+                                    ", ph3_std = ", input$ph3_std,
+                                    ", ph1_pre_val = ", input$ph1_pre_val,
+                                    ", ph2_pre_val = ", input$ph2_pre_val,
+                                    ", ph3_pre_val = ", input$ph3_pre_val,
+                                    ", ph1_mv = ", input$ph1_mv,
+                                    ", ph2_mv = ", input$ph2_mv,
+                                    ", ph3_mv = ", input$ph3_mv,
+                                    ", ph1_post_val = ", input$ph1_post_val,
+                                    ", ph2_post_val = ", input$ph2_post_val,
+                                    ", ph3_post_val = ", input$ph3_post_val,
                                     " WHERE calibration_id = ", calibration_data$next_id))
       }
       if ("pH calibration" %in% send_table$saved[ ,1] | "pH calibration" %in% send_table$restarted_cal[ ,1]) {
@@ -2132,7 +2132,7 @@ observeEvent(validation_check$pH, {
     }
   }, ignoreInit = TRUE)
 
-  observeEvent(input$delete_pH, {
+  observeEvent(input$delete_ph, {
     #delete on remote sheet
     DBI::dbExecute(pool, paste0("DELETE FROM calibrate_ph WHERE calibration_id = ", calibration_data$next_id))
     #reset the fields
@@ -2154,7 +2154,7 @@ observeEvent(validation_check$pH, {
     output$restart_table <- renderTable({ # Display remotely saved calibrations tables
       send_table$restarted_cal
     })
-    complete$pH <- FALSE
+    complete$ph <- FALSE
   }, ignoreInit = TRUE)
 
   ### Validate/Save/Delete temperature ##############################################################################
@@ -2264,17 +2264,17 @@ observeEvent(validation_check$pH, {
     validation_check$orp <- FALSE
       tryCatch({
         orp_std <- input$orp_std
-        orp_post <- input$orp_post_mV
+        orp_post <- input$orp_post_mv
         orp_diff <- abs(orp_std - orp_post)
         if (orp_diff > 10) {
           shinyjs::js$backgroundCol("orp_std", "red")
-          shinyjs::js$backgroundCol("orp_post_mV", "red")
+          shinyjs::js$backgroundCol("orp_post_mv", "red")
         } else if (orp_diff > 5) {
           shinyjs::js$backgroundCol("orp_std", "lemonchiffon")
-          shinyjs::js$backgroundCol("orp_post_mV", "lemonchiffon")
+          shinyjs::js$backgroundCol("orp_post_mv", "lemonchiffon")
         } else {
           shinyjs::js$backgroundCol("orp_std", "white")
-          shinyjs::js$backgroundCol("orp_post_mV", "white")
+          shinyjs::js$backgroundCol("orp_post_mv", "white")
         }
         if (orp_diff > 5) {
           # Show a modal to the user to confirm that they are sure about their entries
@@ -2305,16 +2305,16 @@ observeEvent(validation_check$orp, {
     } else {
       calibration_data$orp <- data.frame(calibration_id = calibration_data$next_id,
                                          orp_std = input$orp_std,
-                                         orp_pre_mv = input$orp_pre_mV,
-                                         orp_post_mv = input$orp_post_mV)
+                                         orp_pre_mv = input$orp_pre_mv,
+                                         orp_post_mv = input$orp_post_mv)
       if (!complete$orp) {
         DBI::dbAppendTable(pool, "calibrate_orp", calibration_data$orp)
         complete$orp <- TRUE
         shinyjs::show("delete_orp")
       } else {
         DBI::dbExecute(pool, paste0("UPDATE calibrate_orp SET orp_std = ", input$orp_std,
-                                    ", orp_pre_mv = ", input$orp_pre_mV,
-                                    ", orp_post_mv = ", input$orp_post_mV,
+                                    ", orp_pre_mv = ", input$orp_pre_mv,
+                                    ", orp_post_mv = ", input$orp_post_mv,
                                     " WHERE calibration_id = ", calibration_data$next_id))
       }
       if ("ORP calibration" %in% send_table$saved[ ,1] | "ORP calibration" %in% send_table$restarted_cal[ ,1]) {
@@ -2359,79 +2359,79 @@ observeEvent(validation_check$orp, {
 
 
   ## Validate/Save/Delete SpC ##############################################################################
-  observeEvent(input$save_cal_SpC, {
-    validation_check$SpC <- FALSE
+  observeEvent(input$save_cal_spc, {
+    validation_check$spc <- FALSE
     if (input$spc_or_not & is.null(calibration_data$temp)) {
       shinyalert::shinyalert("Calibrate temperature first!", "You must calibrate temperature first if entering non-specific conductivity")
       updateSelectizeInput(session, "selection", selected = "Temperature calibration")
       return()
     } else {
-      if (is.na(input$SpC1_post)) {
-        updateNumericInput(session, "SpC1_post", value = input$SpC1_std)
+      if (is.na(input$spc1_post)) {
+        updateNumericInput(session, "spc1_post", value = input$spc1_std)
       }
-      if (is.na(input$SpC2_post)) {
-        updateNumericInput(session, "SpC2_post", value = input$SpC2_std)
+      if (is.na(input$spc2_post)) {
+        updateNumericInput(session, "spc2_post", value = input$spc2_std)
       }
-      if (is.na(input$SpC1_pre)) {
+      if (is.na(input$spc1_pre)) {
         shinyalert::shinyalert("You must enter a pre-calibration value for the low-range conductivity/conductance", type = "error")
         return()
       }
-      if (is.na(input$SpC2_pre)) {
+      if (is.na(input$spc2_pre)) {
         shinyalert::shinyalert("You must enter a pre-calibration value for the high-range conductivity/conductance", type = "error")
         return()
       }
 
       tryCatch({
-        SpC1_ref <- input$SpC1_std
-        SpC2_ref <- input$SpC2_std
-        SpC1_post <- if (input$spc_or_not) input$SpC1_post/(1 + 0.02*(calibration_data$temp$temp_reference - 25)) else input$SpC1_post
-        SpC2_post <- if (input$spc_or_not) input$SpC2_post/(1 + 0.02*(calibration_data$temp$temp_reference - 25)) else input$SpC2_post
-        SpC1_diff <- abs(SpC1_ref - SpC1_post)
-        SpC2_diff <- abs(SpC2_ref - SpC2_post)
+        spc1_ref <- input$spc1_std
+        spc2_ref <- input$spc2_std
+        spc1_post <- if (input$spc_or_not) input$spc1_post/(1 + 0.02*(calibration_data$temp$temp_reference - 25)) else input$spc1_post
+        spc2_post <- if (input$spc_or_not) input$spc2_post/(1 + 0.02*(calibration_data$temp$temp_reference - 25)) else input$spc2_post
+        spc1_diff <- abs(spc1_ref - spc1_post)
+        spc2_diff <- abs(spc2_ref - spc2_post)
         message1 <- character(0)
         message2 <- character(0)
-        if (SpC1_diff > 10) {
-          shinyjs::js$backgroundCol("SpC1_std", "red")
-          shinyjs::js$backgroundCol("SpC1_post", "red")
+        if (spc1_diff > 10) {
+          shinyjs::js$backgroundCol("spc1_std", "red")
+          shinyjs::js$backgroundCol("spc1_post", "red")
           if (input$spc_or_not) {
-            message1 <- paste0("Double check your values: your low-range input converts to an SpC of ", round(SpC1_post, 0), " versus the expected ", SpC1_ref)
+            message1 <- paste0("Double check your values: your low-range input converts to an SpC of ", round(spc1_post, 0), " versus the expected ", spc1_ref)
           } else {
             message1 <- "Warning: double check your low-range values"
           }
-        } else if (SpC1_diff > 5) {
-          shinyjs::js$backgroundCol("SpC1_std", "lemonchiffon")
-          shinyjs::js$backgroundCol("SpC1_post", "lemonchiffon")
+        } else if (spc1_diff > 5) {
+          shinyjs::js$backgroundCol("spc1_std", "lemonchiffon")
+          shinyjs::js$backgroundCol("spc1_post", "lemonchiffon")
           if (input$spc_or_not) {
-            message1 <- paste0("Double check your values: your low-range input converts to an SpC of ", round(SpC1_post, 0), " versus the expected ", SpC1_ref)
+            message1 <- paste0("Double check your values: your low-range input converts to an SpC of ", round(spc1_post, 0), " versus the expected ", spc1_ref)
           } else {
             message1 <- "Warning: double check your values"
           }
         } else {
-          shinyjs::js$backgroundCol("SpC1_std", "white")
-          shinyjs::js$backgroundCol("SpC1_post", "white")
+          shinyjs::js$backgroundCol("spc1_std", "white")
+          shinyjs::js$backgroundCol("spc1_post", "white")
         }
-        if (SpC2_diff > 10) {
-          shinyjs::js$backgroundCol("SpC2_std", "red")
-          shinyjs::js$backgroundCol("SpC2_post", "red")
+        if (spc2_diff > 10) {
+          shinyjs::js$backgroundCol("spc2_std", "red")
+          shinyjs::js$backgroundCol("spc2_post", "red")
           if (input$spc_or_not) {
-            message1 <- paste0("Double check your values: your high-range input converts to an SpC of ", round(SpC2_post, 0), " versus the expected ", SpC2_ref)
+            message1 <- paste0("Double check your values: your high-range input converts to an SpC of ", round(spc2_post, 0), " versus the expected ", spc2_ref)
           } else {
             message1 <- "Warning: double check your high-range values"
           }
-        } else if (SpC2_diff > 5) {
-          shinyjs::js$backgroundCol("SpC2_std", "lemonchiffon")
-          shinyjs::js$backgroundCol("SpC2_post", "lemonchiffon")
+        } else if (spc2_diff > 5) {
+          shinyjs::js$backgroundCol("spc2_std", "lemonchiffon")
+          shinyjs::js$backgroundCol("spc2_post", "lemonchiffon")
           shinyalert::shinyalert(title = "Warning: double check your values", type = "warning", timer = 2000)
           if (input$spc_or_not) {
-            message1 <- paste0("Double check your values: your high-range input converts to an SpC of ", round(SpC2_post, 0), " versus the expected ", SpC2_ref)
+            message1 <- paste0("Double check your values: your high-range input converts to an SpC of ", round(spc2_post, 0), " versus the expected ", spc2_ref)
           } else {
             message1 <- "Warning: double check your high-range values"
           }
         } else {
-          shinyjs::js$backgroundCol("SpC2_std", "white")
-          shinyjs::js$backgroundCol("SpC2_post", "white")
+          shinyjs::js$backgroundCol("spc2_std", "white")
+          shinyjs::js$backgroundCol("spc2_post", "white")
         }
-        if (SpC1_diff > 5 | SpC2_diff > 5) {
+        if (spc1_diff > 5 | spc2_diff > 5) {
           # Show a modal to the user to confirm that they are sure about their entries
           message <- paste0(
             if (length(message1) > 0) paste0(message1,  "<br><br>") else "",
@@ -2441,12 +2441,12 @@ observeEvent(validation_check$orp, {
             title = "Are you sure?",
             message,
             footer = tagList(
-              actionButton("ok_check_SpC", "Yes, I'm sure"),
+              actionButton("ok_check_spc", "Yes, I'm sure"),
               modalButton("Cancel")
             )
           ))
         } else {
-          validation_check$SpC <- TRUE
+          validation_check$spc <- TRUE
         }
       }, error = function(e) {
         shinyalert::shinyalert(title = "You have unfilled mandatory entries", type = "error", timer = 2000)
@@ -2454,26 +2454,26 @@ observeEvent(validation_check$orp, {
     }
   }, ignoreInit = TRUE)
 
-  observeEvent(input$ok_check_SpC, {
+  observeEvent(input$ok_check_spc, {
     removeModal()
-    validation_check$SpC <- TRUE
+    validation_check$spc <- TRUE
   }, ignoreInit = TRUE)
 
-  observeEvent(validation_check$SpC, {
-    if (!validation_check$SpC) {
+  observeEvent(validation_check$spc, {
+    if (!validation_check$spc) {
       return()
     } else {
-      calibration_data$SpC <- data.frame(calibration_id = calibration_data$next_id,
-                                         spc1_std = input$SpC1_std,
-                                         spc1_pre = if (input$spc_or_not) input$SpC1_pre/(1 + 0.02*(calibration_data$temp$temp_reference - 25)) else input$SpC1_pre,
-                                         spc1_post = if (input$spc_or_not) input$SpC1_post/(1 + 0.02*(calibration_data$temp$temp_reference - 25)) else input$SpC1_post,
-                                         spc2_std = input$SpC2_std,
-                                         spc2_pre = if (input$spc_or_not) input$SpC2_pre/(1 + 0.02*(calibration_data$temp$temp_reference - 25)) else input$SpC2_pre,
-                                         spc2_post = if (input$spc_or_not) input$SpC2_post/(1 + 0.02*(calibration_data$temp$temp_reference - 25)) else input$SpC2_post)
+      calibration_data$spc <- data.frame(calibration_id = calibration_data$next_id,
+                                         spc1_std = input$spc1_std,
+                                         spc1_pre = if (input$spc_or_not) input$spc1_pre/(1 + 0.02*(calibration_data$temp$temp_reference - 25)) else input$spc1_pre,
+                                         spc1_post = if (input$spc_or_not) input$spc1_post/(1 + 0.02*(calibration_data$temp$temp_reference - 25)) else input$spc1_post,
+                                         spc2_std = input$spc2_std,
+                                         spc2_pre = if (input$spc_or_not) input$spc2_pre/(1 + 0.02*(calibration_data$temp$temp_reference - 25)) else input$spc2_pre,
+                                         spc2_post = if (input$spc_or_not) input$spc2_post/(1 + 0.02*(calibration_data$temp$temp_reference - 25)) else input$spc2_post)
 
-      if (!complete$SpC) {
+      if (!complete$spc) {
         tryCatch({
-          DBI::dbAppendTable(pool, "calibrate_specific_conductance", calibration_data$SpC)
+          DBI::dbAppendTable(pool, "calibrate_specific_conductance", calibration_data$spc)
 
           if ("Conductivity calibration" %in% send_table$saved[ ,1] | "Conductivity calibration" %in% send_table$restarted_cal[ ,1]) {
             shinyalert::shinyalert(title = "Conductivity calibration overwritten", type = "success", timer = 2000, immediate = TRUE)
@@ -2489,19 +2489,19 @@ observeEvent(validation_check$orp, {
             send_table$saved
           })
 
-          complete$SpC <- TRUE
-          shinyjs::show("delete_SpC")
+          complete$spc <- TRUE
+          shinyjs::show("delete_spc")
         }, error = function(e) {
           shinyalert::shinyalert(title = "Failed to make new entry to database... are you sure all entries are correct and that you are entering specific or non-specific conductivity as required by your instrument?", type = "error", timer = 4000)
         })
       } else {
         tryCatch({
-          DBI::dbExecute(pool, paste0("UPDATE calibrate_specific_conductance SET spc1_std = ", input$SpC1_std,
-                                      ", spc1_pre = ", if (input$spc_or_not) input$SpC1_pre/(1 + 0.02*(calibration_data$temp$temp_reference - 25)) else input$SpC1_pre,
-                                      ", spc1_post = ", if (input$spc_or_not) input$SpC1_post/(1 + 0.02*(calibration_data$temp$temp_reference - 25)) else input$SpC1_post,
-                                      ", spc2_std = ", input$SpC2_std,
-                                      ", spc2_pre = ", if (input$spc_or_not) input$SpC2_pre/(1 + 0.02*(calibration_data$temp$temp_reference - 25)) else input$SpC2_pre,
-                                      ", spc2_post = ", if (input$spc_or_not) input$SpC2_post/(1 + 0.02*(calibration_data$temp$temp_reference - 25)) else input$SpC2_post,
+          DBI::dbExecute(pool, paste0("UPDATE calibrate_specific_conductance SET spc1_std = ", input$spc1_std,
+                                      ", spc1_pre = ", if (input$spc_or_not) input$spc1_pre/(1 + 0.02*(calibration_data$temp$temp_reference - 25)) else input$spc1_pre,
+                                      ", spc1_post = ", if (input$spc_or_not) input$spc1_post/(1 + 0.02*(calibration_data$temp$temp_reference - 25)) else input$spc1_post,
+                                      ", spc2_std = ", input$spc2_std,
+                                      ", spc2_pre = ", if (input$spc_or_not) input$spc2_pre/(1 + 0.02*(calibration_data$temp$temp_reference - 25)) else input$spc2_pre,
+                                      ", spc2_post = ", if (input$spc_or_not) input$spc2_post/(1 + 0.02*(calibration_data$temp$temp_reference - 25)) else input$spc2_post,
                                       " WHERE calibration_id = ", calibration_data$next_id))
 
           if ("Conductivity calibration" %in% send_table$saved[ ,1] | "Conductivity calibration" %in% send_table$restarted_cal[ ,1]) {
@@ -2525,7 +2525,7 @@ observeEvent(validation_check$orp, {
     }
   }, ignoreInit = TRUE)
 
-  observeEvent(input$delete_SpC, {
+  observeEvent(input$delete_spc, {
     DBI::dbExecute(pool, paste0("DELETE FROM calibrate_specific_conductance WHERE calibration_id = ", calibration_data$next_id))
     #reset the fields
     reset_spc()
@@ -2546,7 +2546,7 @@ observeEvent(validation_check$orp, {
     output$restart_table <- renderTable({ # Display remotely saved calibrations tables
       send_table$restarted_cal
     })
-    complete$SpC <- FALSE
+    complete$spc <- FALSE
   }, ignoreInit = TRUE)
 
   ### Save/Delete turbidity ##############################################################################
@@ -2671,17 +2671,17 @@ observeEvent(validation_check$orp, {
   }, ignoreInit = TRUE)
 
   ## Validate/Save/Delete DO ##############################################################################
-  observeEvent(input$save_cal_DO, {
-    validation_check$DO <- FALSE
+  observeEvent(input$save_cal_do, {
+    validation_check$do <- FALSE
     tryCatch({
       baro_post <- input$baro_press_post
-      DO_post <- input$DO_post
+      do_post <- input$do_post
       message1 <- character(0)
       message2 <- character(0)
       if (baro_post < 600 | baro_post > 800) {
         message1 <- "Baro pressures are not in range, are you sure?"
       }
-      if (DO_post < 1 | DO_post > 15) {
+      if (do_post < 1 | do_post > 15) {
         message2 <- "DO values are not in range, are you sure you entered % and mg/l in the right boxes? Only mg/l is saved, use the Fill/recalculate button."
       }
       if (length(message1) > 0 | length(message2) > 0) {
@@ -2699,37 +2699,37 @@ observeEvent(validation_check$orp, {
           )
         ))
       } else {
-        validation_check$DO <- TRUE
+        validation_check$do <- TRUE
       }
     }, error = function(e) {
       shinyalert::shinyalert(title = "You have unfilled mandatory entries", "Baro pressure and DO in mg/l are mandatory", type = "error", timer = 4000)
     })
   }, ignoreInit = TRUE)
 
-  observeEvent(input$ok_check_DO, {
+  observeEvent(input$ok_check_do, {
     removeModal()
-    validation_check$DO <- TRUE
+    validation_check$do <- TRUE
   })
 
-  observeEvent(validation_check$DO, {
-    if (!validation_check$DO) {
+  observeEvent(validation_check$do, {
+    if (!validation_check$do) {
       return()
     } else {
-      calibration_data$DO <- data.frame(calibration_id = calibration_data$next_id,
+      calibration_data$do <- data.frame(calibration_id = calibration_data$next_id,
                                         baro_press_pre = input$baro_press_pre,
                                         baro_press_post = input$baro_press_post,
-                                        do_pre_mgl = input$DO_pre,
-                                        do_post_mgl = input$DO_post)
-      if (!complete$DO) {
-        DBI::dbAppendTable(pool, "calibrate_dissolved_oxygen", calibration_data$DO)
+                                        do_pre_mgl = input$do_pre,
+                                        do_post_mgl = input$do_post)
+      if (!complete$do) {
+        DBI::dbAppendTable(pool, "calibrate_dissolved_oxygen", calibration_data$do)
 
-        complete$DO <- TRUE
-        shinyjs::show("delete_DO")
+        complete$do <- TRUE
+        shinyjs::show("delete_do")
       } else {
         DBI::dbExecute(pool, paste0("UPDATE calibrate_dissolved_oxygen SET baro_press_pre = ", input$baro_press_pre,
                                     ", baro_press_post = ", input$baro_press_post,
-                                    ", do_pre_mgl = ", input$DO_pre,
-                                    ", do_post_mgl = ", input$DO_post,
+                                    ", do_pre_mgl = ", input$do_pre,
+                                    ", do_post_mgl = ", input$do_post,
                                     " WHERE calibration_id = ", calibration_data$next_id))
       }
       if ("DO calibration" %in% send_table$saved[ ,1] | "DO calibration" %in% send_table$restarted_cal[ ,1]) {
@@ -2748,7 +2748,7 @@ observeEvent(validation_check$orp, {
     }
   }, ignoreInit = TRUE)
 
-  observeEvent(input$delete_DO, {
+  observeEvent(input$delete_do, {
     DBI::dbExecute(pool, paste0("DELETE FROM calibrate_dissolved_oxygen WHERE calibration_id = ", calibration_data$next_id))
     #reset the fields
     reset_do()
@@ -2769,7 +2769,7 @@ observeEvent(validation_check$orp, {
     output$restart_table <- renderTable({ # Display remotely saved calibrations tables
       send_table$restarted_cal
     })
-    complete$DO <- FALSE
+    complete$do <- FALSE
   }, ignoreInit = TRUE)
 
   ## Validate/Save/Delete depth ##############################################################################
@@ -2889,20 +2889,20 @@ observeEvent(validation_check$depth, {
                                  # Reset complete flags
                                  complete$basic <- FALSE
                                  complete$temperature <- FALSE
-                                 complete$SpC <- FALSE
-                                 complete$pH <- FALSE
+                                 complete$spc <- FALSE
+                                 complete$ph <- FALSE
                                  complete$orp <- FALSE
                                  complete$turbidity <- FALSE
-                                 complete$DO <- FALSE
+                                 complete$do <- FALSE
                                  complete$depth <- FALSE
                                  # Reset data.frames
                                  calibration_data$basic <- NULL
                                  calibration_data$temperature <- NULL
-                                 calibration_data$SpC <- NULL
-                                 calibration_data$pH <- NULL
+                                 calibration_data$spc <- NULL
+                                 calibration_data$ph <- NULL
                                  calibration_data$orp <- NULL
                                  calibration_data$turbidity <- NULL
-                                 calibration_data$DO <- NULL
+                                 calibration_data$do <- NULL
                                  calibration_data$depth <- NULL
                                  # Reset tables
                                  send_table$saved <- data.frame("Saved calibrations" = "Nothing saved yet", check.names = FALSE) #Title is modified later for clarity if user want to restart a cal
