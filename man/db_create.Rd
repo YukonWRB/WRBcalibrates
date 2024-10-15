@@ -4,12 +4,10 @@
 \alias{db_create}
 \title{Initial calibration database creation}
 \usage{
-db_create(con = calConnect(), schema = NULL, overwrite = FALSE)
+db_create(con = calConnect(), overwrite = FALSE)
 }
 \arguments{
 \item{con}{A connection to the target database. Default is the calConnect() function.}
-
-\item{schema}{The schema to create the tables in. Default is NULL.}
 
 \item{overwrite}{TRUE overwrites the database, if one exists in the same path. Will not work if schema is not NULL to prevent accidental deletion of data. Default is FALSE.}
 }

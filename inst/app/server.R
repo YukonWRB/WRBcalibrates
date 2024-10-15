@@ -1227,8 +1227,8 @@ table.on("click", "tr", function() {
                       "sensor_make" = input$new_sensor_make,
                       "sensor_model" = input$new_sensor_model,
                       "sensor_asset_tag" = if (nchar(input$new_sensor_asset_tag) > 0) input$new_sensor_asset_tag else NA,
-                      "sensor_date_purchased" = if (length(input$new_sensor_date_purchased) > 0) input$new_sensor_date_purchased else NA,
-                      "sensor_date_in_service" = if (length(input$new_sensor_date_in_service) > 0) input$new_sensor_date_in_service else NA,
+                      "date_purchased" = if (length(input$new_sensor_date_purchased) > 0) input$new_sensor_date_purchased else NA,
+                      "date_in_service" = if (length(input$new_sensor_date_in_service) > 0) input$new_sensor_date_in_service else NA,
                       "sensor_notes" = if (nchar(input$new_sensor_notes) > 0) input$new_sensor_notes else NA)
     DBI::dbAppendTable(pool, "sensors", tbl)
 
@@ -1250,8 +1250,8 @@ table.on("click", "tr", function() {
                       "sensor_make" = input$new_sensor_make,
                       "sensor_model" = input$new_sensor_model,
                       "sensor_asset_tag" = if (nchar(input$new_sensor_asset_tag) > 0) input$new_sensor_asset_tag else NA,
-                      "sensor_date_purchased" = if (length(input$new_sensor_date_purchased) > 0) input$new_sensor_date_purchased else NA,
-                      "sensor_date_in_service" = if (length(input$new_sensor_date_in_service) > 0) input$new_sensor_date_in_service else NA,
+                      "date_purchased" = if (length(input$new_sensor_date_purchased) > 0) input$new_sensor_date_purchased else NA,
+                      "date_in_service" = if (length(input$new_sensor_date_in_service) > 0) input$new_sensor_date_in_service else NA,
                       "sensor_notes" = if (nchar(input$new_sensor_notes) > 0) input$new_sensor_notes else NA)
     DBI::dbAppendTable(pool, "sensors", tbl)
 
