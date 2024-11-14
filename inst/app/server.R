@@ -132,7 +132,7 @@ table.on("click", "tr", function() {
   instruments_data$types <- DBI::dbGetQuery(pool, "SELECT * FROM instrument_type")
   instruments_data$handhelds <- instruments_sheet[instruments_sheet$type == "Handheld" & is.na(instruments_sheet$date_retired) , ]
   instruments_data$others <- instruments_sheet[instruments_sheet$type != "Handheld" & is.na(instruments_sheet$date_retired) , ]
-  instruments_data$maintainable_sensors <- instruments_sheet[instruments_sheet$type %in% c("Sonde", "Bulkhead") , ]
+  instruments_data$maintainable_sensors <- instruments_sheet[instruments_sheet$holds_replaceable_sensors , ]
   instruments_data$instrument_maintenance <- DBI::dbGetQuery(pool, "SELECT * FROM instrument_maintenance")
 
   sensors_data$sensors <- DBI::dbGetQuery(pool, paste0("SELECT * FROM sensors"))
@@ -960,7 +960,7 @@ table.on("click", "tr", function() {
     } else if (input$first_selection == "Change/maintain sensors") {
       #reload instruments_data$sheet to mitigate conflicts
       instruments_data$sheet <- DBI::dbGetQuery(pool, "SELECT i.instrument_id, i.obs_datetime, CONCAT(observers.observer_first, ' ', observers.observer_last, '(', observers.organization, ')') AS observer, i.holds_replaceable_sensors, i.serial_no, i.asset_tag, i.date_in_service, i.date_purchased, i.retired_by, i.date_retired, instrument_make.make, instrument_model.model, instrument_type.type, i.owner FROM instruments AS i LEFT JOIN instrument_make ON i.make = instrument_make.make_id LEFT JOIN instrument_model ON i.model = instrument_model.model_id LEFT JOIN instrument_type ON i.type = instrument_type.type_id LEFT JOIN observers ON i.observer = observers.observer_id ORDER BY i.instrument_id")
-      instruments_data$maintainable_sensors <- instruments_data$sheet[instruments_data$sheet$type %in% c("Sonde", "Bulkhead") , ]
+      instruments_data$maintainable_sensors <- instruments_data$sheet[instruments_data$sheet$holds_replaceable_sensors , ]
       temp_table <- instruments_data$maintainable_sensors[, c("make", "model", "type", "serial_no", "owner")]
       output$manage_sensors_table <- DT::renderDataTable(temp_table, rownames = FALSE, selection = "single")
       updateSelectizeInput(session, "maintain_serial", choices = c("", instruments_data$maintainable_sensors$serial_no))
@@ -1568,7 +1568,7 @@ table.on("click", "tr", function() {
       instruments_data$sheet <- instruments_sheet
       instruments_data$handhelds <- instruments_sheet[instruments_sheet$type == "Handheld" & is.na(instruments_sheet$date_retired) , ]
       instruments_data$others <- instruments_sheet[instruments_sheet$type != "Handheld" & is.na(instruments_sheet$date_retired) , ]
-      instruments_data$maintainable_sensors <- instruments_sheet[instruments_sheet$type %in% c("Sonde", "Bulkhead") , ]
+      instruments_data$maintainable_sensors <- instruments_sheet[instruments_sheet$holds_replaceable_sensors , ]
 
       #Reset some fields, show/hide others
       updateSelectizeInput(session, "existing_serial_no", choices = c("New record", instruments_data$sheet$serial_no), selected = input$existing_serial_no)
