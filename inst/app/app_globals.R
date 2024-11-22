@@ -1,23 +1,27 @@
-library(shiny)
-library(shinyjs)
+calibrate_globals <- function(dbName, dbHost, dbPort, dbUser, dbPass, RLS_user, RLS_pass) {
 
-# Establish database connection
-if (!exists("pool")) {
-  # pool <- pool::dbPool(
-  #   drv = RPostgres::Postgres(),
-  #   dbname = "calibrations",
-  #   host = Sys.getenv("calHost"),
-  #   port = Sys.getenv("calPort"),
-  #   user = Sys.getenv("calUser"),
-  #   password = Sys.getenv("calPass")
-  # )
+  library(shiny)
+  library(shinyjs)
 
-  pool <- pool::dbPool(
-    drv = RPostgres::Postgres(),
-    dbname = "AquaCache",
-    host = Sys.getenv("AquaCacheHost"),
-    port = Sys.getenv("AquaCachePort"),
-    user = Sys.getenv("AquaCacheAdminUSer"),
-    password = Sys.getenv("AquaCacheAdminPass")
-  )
+  # Establish database connection
+  if (!exists("pool")) {
+    # pool <- pool::dbPool(
+    #   drv = RPostgres::Postgres(),
+    #   dbname = "calibrations",
+    #   host = Sys.getenv("calHost"),
+    #   port = Sys.getenv("calPort"),
+    #   user = Sys.getenv("calUser"),
+    #   password = Sys.getenv("calPass")
+    # )
+
+    pool <<- pool::dbPool(
+      drv = RPostgres::Postgres(),
+      dbname = dbName,
+      host = dbHost,
+      port = dbPort,
+      user = dbUser,
+      password = dbPass
+    )
+  }
+
 }
