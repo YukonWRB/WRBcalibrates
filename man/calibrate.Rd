@@ -7,11 +7,11 @@
 calibrate(
   host = getOption("shiny.host", "127.0.0.1"),
   port = getOption("shiny.port"),
-  dbName = "AquaCache",
-  dbHost = Sys.getenv("AquaCacheHost"),
-  dbPort = Sys.getenv("AquaCachePort"),
-  dbUser = Sys.getenv("AquaCacheUser"),
-  dbPass = Sys.getenv("AquaCachePass"),
+  dbName = "aquacache",
+  dbHost = Sys.getenv("aquacacheHost"),
+  dbPort = Sys.getenv("aquacachePort"),
+  dbUser = Sys.getenv("aquacacheUser"),
+  dbPass = Sys.getenv("aquacachePass"),
   RLS_user = Sys.getenv("RLS_user"),
   RLS_pass = Sys.getenv("RLS_pass"),
   browser = TRUE,
@@ -23,15 +23,15 @@ calibrate(
 
 \item{port}{Port number (numeric). Leave default to use the default port specified in your user options. The port you specify must be open on the host machine for it to broadcast to the network.}
 
-\item{dbName}{Name of the AquaCache database. Default is "AquaCache".}
+\item{dbName}{Name of the aquacache database. Default is "aquacache".}
 
-\item{dbHost}{Host address of the AquaCache database. Default is pulled from the .Renviron file.}
+\item{dbHost}{Host address of the aquacache database. Default is pulled from the .Renviron file.}
 
-\item{dbPort}{Port number of the AquaCache database. Default is pulled from the .Renviron file.}
+\item{dbPort}{Port number of the aquacache database. Default is pulled from the .Renviron file.}
 
-\item{dbUser}{Username for the AquaCache database. Default is pulled from the .Renviron file.}
+\item{dbUser}{Username for the aquacache database. Default is pulled from the .Renviron file.}
 
-\item{dbPass}{Password for the AquaCache database. Default is pulled from the .Renviron file.}
+\item{dbPass}{Password for the aquacache database. Default is pulled from the .Renviron file.}
 
 \item{RLS_user}{Username for row-level security. Default is pulled from the .Renviron file.}
 

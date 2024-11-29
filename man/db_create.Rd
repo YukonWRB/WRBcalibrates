@@ -19,7 +19,7 @@ New tables in the target postgres database.
 \ifelse{html}{\href{https://lifecycle.r-lib.org/articles/stages.html#deprecated}{\figure{lifecycle-deprecated.svg}{options: alt='[Deprecated]'}}}{\strong{[Deprecated]}}
 }
 \details{
-This creates a stand-alone calibration and instrument maintenance tracking database and was last worked on in September 2024. Further development moved to integrating this database with the AquaCache database.
+This creates a stand-alone calibration and instrument maintenance tracking database and was last worked on in September 2024. Further development moved to integrating this database with the aquacache database.
 
 Populates a postgres database with the necessary tables for the calibration app. A database should be created before using this function, but it can be left empty.
 

@@ -531,7 +531,7 @@ table.on("click", "tr", function() {
   output$ORP_molarity_note <- renderUI({
     HTML(messages$ORP_molarity_note)
   })
-  messages$deploy_instrument_placeholder <- "This function has not been created yet. If you think you'll actually use it let me know and I'll make it. Deployments can be linked directly to locations already in the AquaCache database, which would be nice for data management."
+  messages$deploy_instrument_placeholder <- "This function has not been created yet. If you think you'll actually use it let me know and I'll make it. Deployments can be linked directly to locations already in the aquacache database, which would be nice for data management."
   output$deploy_instrument_placeholder <- renderText({
     messages$deploy_instrument_placeholder
   })

@@ -2,14 +2,14 @@
 % Please edit documentation in R/connect.R
 \name{AquaConnect}
 \alias{AquaConnect}
-\title{Connect to the AquaCache database for calibrations/instrument management}
+\title{Connect to the aquacache database for calibrations/instrument management}
 \usage{
 AquaConnect(
-  name = "AquaCache",
-  host = Sys.getenv("AquaCacheHost"),
-  port = Sys.getenv("AquaCachePort"),
-  username = Sys.getenv("AquaCacheAdminUser"),
-  password = Sys.getenv("AquaCacheAdminPass"),
+  name = "aquacache",
+  host = Sys.getenv("aquacacheHost"),
+  port = Sys.getenv("aquacachePort"),
+  username = Sys.getenv("aquacacheAdminUser"),
+  password = Sys.getenv("aquacacheAdminPass"),
   silent = FALSE
 )
 }

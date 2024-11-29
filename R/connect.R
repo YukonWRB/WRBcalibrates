@@ -1,4 +1,4 @@
-#' Connect to the AquaCache database for calibrations/instrument management
+#' Connect to the aquacache database for calibrations/instrument management
 #'
 #' @description
 #' `r lifecycle::badge("stable")`
@@ -17,7 +17,7 @@
 #' @export
 #'
 
-AquaConnect <- function(name = "AquaCache", host = Sys.getenv("AquaCacheHost"), port = Sys.getenv("AquaCachePort"), username = Sys.getenv("AquaCacheAdminUser"), password = Sys.getenv("AquaCacheAdminPass"), silent = FALSE){
+AquaConnect <- function(name = "aquacache", host = Sys.getenv("aquacacheHost"), port = Sys.getenv("aquacachePort"), username = Sys.getenv("aquacacheAdminUser"), password = Sys.getenv("aquacacheAdminPass"), silent = FALSE){
 
   tryCatch({
     cal <- DBI::dbConnect(drv = RPostgres::Postgres(),
