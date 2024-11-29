@@ -3,7 +3,7 @@
 #'#' @description
 #' `r lifecycle::badge("deprecated")`
 #'
-#' This creates a stand-alone calibration and instrument maintenance tracking database and was last worked on in September 2024. Further development moved to integrating this database with the AquaCache database.
+#' This creates a stand-alone calibration and instrument maintenance tracking database and was last worked on in September 2024. Further development moved to integrating this database with the aquacache database.
 #'
 #' Populates a postgres database with the necessary tables for the calibration app. A database should be created before using this function, but it can be left empty.
 #'
@@ -35,7 +35,7 @@ db_create <- function(con = calConnect(), overwrite = FALSE) {
     DBI::dbExecute(con, "VACUUM")
   }
 
-  # Establish a link to the hydromet/AquaCache database
+  # Establish a link to the hydromet/aquacache database
   DBI::dbExecute(con, "CREATE EXTENSION IF NOT EXISTS postgres_fdw;")
 
   DBI::dbExecute(con, paste0("CREATE SERVER IF NOT EXISTS hydromet_server
